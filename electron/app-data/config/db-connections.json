@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "connections": [
+    {
+      "id": "conn_1744521600000_abc123xyz",
+      "name": "本地 Kingbase 测试库",
+      "type": "kingbase",
+      "config": {
+        "host": "localhost",
+        "port": 54321,
+        "database": "testdb",
+        "user": "system",
+        "password": "password",
+        "max": 20,
+        "idleTimeoutMillis": 30000,
+        "connectionTimeoutMillis": 5000
+      },
+      "createdAt": "2025-04-13T08:00:00.000Z",
+      "updatedAt": "2025-04-13T08:00:00.000Z",
+      "isDefault": true,
+      "description": "本地开发测试用 Kingbase 数据库"
+    },
+    {
+      "id": "conn_1744521700000_def456uvw",
+      "name": "Oracle 生产库",
+      "type": "oracle",
+      "config": {
+        "user": "scott",
+        "password": "tiger",
+        "connectString": "192.168.1.100:1521/ORCL",
+        "poolMin": 0,
+        "poolMax": 10,
+        "poolIncrement": 1,
+        "poolTimeout": 60
+      },
+      "createdAt": "2025-04-13T08:10:00.000Z",
+      "updatedAt": "2025-04-13T08:10:00.000Z",
+      "isDefault": false,
+      "description": "生产环境 Oracle 数据库"
+    },
+    {
+      "id": "conn_1744521800000_ghi789rst",
+      "name": "测试环境 Kingbase",
+      "type": "kingbase",
+      "config": {
+        "host": "192.168.1.50",
+        "port": 54321,
+        "database": "uat_db",
+        "user": "test_user",
+        "password": "test_pass"
+      },
+      "createdAt": "2025-04-13T08:20:00.000Z",
+      "updatedAt": "2025-04-13T08:20:00.000Z",
+      "isDefault": false,
+      "description": "UAT 测试环境"
+    }
+  ],
+  "lastUpdated": "2025-04-13T08:20:00.000Z"
+}
