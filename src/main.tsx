@@ -9,7 +9,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>,
 )
 
-// Use contextBridge
-window.ipcRenderer.on('main-process-message', (_event, message) => {
+// 接收主进程消息
+window.electronAPI.on('main-process-message', (message) => {
   console.log(message)
 })

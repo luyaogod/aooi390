@@ -1,7 +1,9 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { appDB } from './db/clients'
+import { appDB, externalDB } from './db/clients'
+import { getDatabasePath } from './utils/paths'
+import { dbConnectionManager } from './config/db-connections'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -61,6 +63,107 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
+  }
+})
+
+// IPC: 获取 SQLite 数据库连接状态
+ipcMain.handle('db:get-sqlite-status', async () => {
+  try {
+    const isHealthy = await appDB.healthCheck()
+    return {
+      connected: isHealthy,
+      status: isHealthy ? '已连接' : '未连接',
+      dbType: 'SQLite',
+      dbPath: getDatabasePath(),
+    }
+  } catch (error) {
+    return {
+      connected: false,
+      status: '连接失败',
+      dbType: 'SQLite',
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+})
+
+// IPC: 获取外部数据库连接配置列表
+ipcMain.handle('db:get-external-connections', async () => {
+  try {
+    await dbConnectionManager.initialize()
+    const connections = dbConnectionManager.getAllConnections()
+    return {
+      success: true,
+      connections: connections.map(conn => ({
+        id: conn.id,
+        name: conn.name,
+        type: conn.type,
+        isDefault: conn.isDefault,
+        description: conn.description,
+      })),
+    }
+  } catch (error) {
+    console.error('[Main] 获取外部数据库连接配置失败:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      connections: [],
+    }
+  }
+})
+
+// IPC: 测试外部数据库连接
+ipcMain.handle('db:test-external-connection', async (_event, connectionId: string) => {
+  try {
+    await dbConnectionManager.initialize()
+    const connection = dbConnectionManager.getConnectionById(connectionId)
+
+    if (!connection) {
+      return {
+        success: false,
+        connected: false,
+        message: '未找到连接配置',
+      }
+    }
+
+    // 先断开当前连接（如果有）
+    if (externalDB.isConnected) {
+      await externalDB.disconnect()
+    }
+
+    // 尝试连接
+    await externalDB.connect(
+      connection.type === 'kingbase'
+        ? { type: 'kingbase', config: connection.config as import('./db/clients').KingbaseConfig }
+        : { type: 'oracle', config: connection.config as import('./db/clients').OracleConfig }
+    )
+
+    // 健康检查
+    const isHealthy = await externalDB.healthCheck()
+
+    if (isHealthy) {
+      return {
+        success: true,
+        connected: true,
+        message: `${connection.type === 'kingbase' ? 'Kingbase' : 'Oracle'} 连接成功`,
+        dbType: connection.type,
+        name: connection.name,
+      }
+    } else {
+      return {
+        success: false,
+        connected: false,
+        message: '连接建立但健康检查失败',
+        dbType: connection.type,
+        name: connection.name,
+      }
+    }
+  } catch (error) {
+    console.error('[Main] 测试外部数据库连接失败:', error)
+    return {
+      success: false,
+      connected: false,
+      message: error instanceof Error ? error.message : String(error),
+    }
   }
 })
 

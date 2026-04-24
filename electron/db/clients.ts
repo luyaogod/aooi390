@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import * as oracledb from 'oracledb';
+import { getDatabasePath } from '../utils/paths';
 
 // ==================== 类型定义 ====================
 
@@ -57,11 +58,18 @@ export class AppDBManager {
   private _isConnected: boolean = false;
 
   private constructor() {
+    // 确保 DATABASE_URL 环境变量已设置
+    // 开发环境从 .env 读取，打包环境通过 pathManager 计算实际路径
+    if (!process.env.DATABASE_URL) {
+      const dbPath = getDatabasePath().replace(/\\/g, '/');
+      process.env.DATABASE_URL = `file:${dbPath}`;
+      console.log('[AppDBManager] DATABASE_URL set to:', process.env.DATABASE_URL);
+    }
+
     // 初始化 Prisma Client
-    // 数据库路径由 prisma.config.ts 中的 datasource.url 配置
     this.prisma = new PrismaClient({
-      log: process.env.NODE_ENV === 'development' 
-        ? ['query', 'info', 'warn', 'error'] 
+      log: process.env.NODE_ENV === 'development'
+        ? ['query', 'info', 'warn', 'error']
         : ['error'],
     });
   }

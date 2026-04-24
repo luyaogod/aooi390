@@ -6,11 +6,11 @@
       "name": "本地 Kingbase 测试库",
       "type": "kingbase",
       "config": {
-        "host": "localhost",
+        "host": "172.19.93.55",
         "port": 54321,
-        "database": "testdb",
-        "user": "system",
-        "password": "password",
+        "database": "topprd",
+        "user": "dsdata",
+        "password": "dsdata",
         "max": 20,
         "idleTimeoutMillis": 30000,
         "connectionTimeoutMillis": 5000
@@ -36,23 +36,7 @@
       "createdAt": "2025-04-13T08:10:00.000Z",
       "updatedAt": "2025-04-13T08:10:00.000Z",
       "isDefault": false,
-      "description": "生产环境 Oracle 数据库"
-    },
-    {
-      "id": "conn_1744521800000_ghi789rst",
-      "name": "测试环境 Kingbase",
-      "type": "kingbase",
-      "config": {
-        "host": "192.168.1.50",
-        "port": 54321,
-        "database": "uat_db",
-        "user": "test_user",
-        "password": "test_pass"
-      },
-      "createdAt": "2025-04-13T08:20:00.000Z",
-      "updatedAt": "2025-04-13T08:20:00.000Z",
-      "isDefault": false,
-      "description": "UAT 测试环境"
+      "description": "Oracle 数据库"
     }
   ],
   "lastUpdated": "2025-04-13T08:20:00.000Z"

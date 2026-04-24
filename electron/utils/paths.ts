@@ -1,5 +1,8 @@
 import { app } from 'electron';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * 路径管理器
@@ -19,7 +22,7 @@ class PathManager {
      */
     public getAppDataRoot(): string {
         return this.isDev
-            ? path.join(__dirname, 'app-data')
+            ? path.join(__dirname, '..', 'electron', 'app-data')
             : process.resourcesPath;
     }
 
