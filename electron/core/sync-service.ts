@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import JSON5 from 'json5';
 import { appDB, externalDB } from '../db/clients';
 import { pathManager } from '../utils/paths';
 import { dbConnectionManager } from '../config/db-connections';
@@ -35,7 +36,7 @@ export class DBSyncService {
   private syncConfigPath: string;
 
   constructor() {
-    this.syncConfigPath = pathManager.getConfigFile('table-names-sync.json');
+    this.syncConfigPath = pathManager.getConfigFile('table-names-sync.json5');
   }
 
   /**
@@ -44,7 +45,7 @@ export class DBSyncService {
   public async loadSyncConfig(): Promise<SyncConfig> {
     try {
       const data = await fs.promises.readFile(this.syncConfigPath, 'utf-8');
-      return JSON.parse(data);
+      return JSON5.parse(data);
     } catch (error) {
       logger.error(error, '[DBSyncService] 加载同步配置失败');
       return { tables: [] };

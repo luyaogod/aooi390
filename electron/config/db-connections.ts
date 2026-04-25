@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import JSON5 from 'json5';
 import { pathManager } from '../utils/paths';
 import logger from '../utils/logger';
 import type { ExternalDBType, KingbaseConfig, OracleConfig } from '../db/clients';
@@ -10,18 +11,12 @@ import type { ExternalDBType, KingbaseConfig, OracleConfig } from '../db/clients
  * 数据库连接配置基础接口
  */
 export interface DBConnection {
-  /** 连接唯一标识 */
-  id: string;
-  /** 连接名称（显示用） */
+  /** 连接名称（唯一标识） */
   name: string;
   /** 数据库类型 */
   type: ExternalDBType;
   /** 连接配置 */
   config: KingbaseConfig | OracleConfig;
-  /** 创建时间 */
-  createdAt: string;
-  /** 最后更新时间 */
-  updatedAt: string;
   /** 是否默认连接 */
   isDefault?: boolean;
   /** 备注描述 */
@@ -54,12 +49,8 @@ export interface UpdateConnectionRequest {
  * 连接配置文件结构
  */
 interface DBConnectionsFile {
-  /** 配置文件版本 */
-  version: string;
   /** 连接列表 */
   connections: DBConnection[];
-  /** 最后更新时间 */
-  lastUpdated: string;
 }
 
 // ==================== DBConnectionManager ====================
@@ -76,7 +67,7 @@ export class DBConnectionManager {
   private initialized: boolean = false;
 
   private constructor() {
-    this.configFilePath = pathManager.getConfigFile('db-connections.json');
+    this.configFilePath = pathManager.getConfigFile('db-connections.json5');
   }
 
   /**
@@ -108,9 +99,7 @@ export class DBConnectionManager {
       // 如果配置文件不存在，创建默认配置
       if (!fs.existsSync(this.configFilePath)) {
         await this.saveToFile({
-          version: '1.0.0',
           connections: [],
-          lastUpdated: new Date().toISOString(),
         });
       }
 
@@ -133,12 +122,12 @@ export class DBConnectionManager {
   }
 
   /**
-   * 根据 ID 获取连接配置
-   * @param id 连接 ID
+   * 根据名称获取连接配置
+   * @param name 连接名称
    */
-  public getConnectionById(id: string): DBConnection | null {
+  public getConnectionByName(name: string): DBConnection | null {
     this.ensureInitialized();
-    return this.connections.find(conn => conn.id === id) || null;
+    return this.connections.find(conn => conn.name === name) || null;
   }
 
   /**
@@ -165,22 +154,20 @@ export class DBConnectionManager {
   public async createConnection(request: CreateConnectionRequest): Promise<DBConnection> {
     this.ensureInitialized();
 
-    // 生成唯一 ID
-    const id = this.generateId();
+    // 检查名称是否重复
+    if (this.connections.some(conn => conn.name === request.name)) {
+      throw new Error(`连接名称"${request.name}"已存在`);
+    }
 
     // 如果设置为默认，取消其他默认连接
     if (request.isDefault) {
       this.clearDefaultFlag();
     }
 
-    const now = new Date().toISOString();
     const connection: DBConnection = {
-      id,
       name: request.name,
       type: request.type,
       config: request.config,
-      createdAt: now,
-      updatedAt: now,
       isDefault: request.isDefault || false,
       description: request.description,
     };
@@ -194,15 +181,15 @@ export class DBConnectionManager {
 
   /**
    * 更新连接配置
-   * @param id 连接 ID
+   * @param name 连接名称
    * @param request 更新请求
    */
-  public async updateConnection(id: string, request: UpdateConnectionRequest): Promise<DBConnection | null> {
+  public async updateConnection(name: string, request: UpdateConnectionRequest): Promise<DBConnection | null> {
     this.ensureInitialized();
 
-    const index = this.connections.findIndex(conn => conn.id === id);
+    const index = this.connections.findIndex(conn => conn.name === name);
     if (index === -1) {
-      logger.warn('[DBConnectionManager] 未找到连接: %s', id);
+      logger.warn('[DBConnectionManager] 未找到连接: %s', name);
       return null;
     }
 
@@ -220,8 +207,6 @@ export class DBConnectionManager {
     if (request.isDefault !== undefined) connection.isDefault = request.isDefault;
     if (request.description !== undefined) connection.description = request.description;
 
-    connection.updatedAt = new Date().toISOString();
-
     await this.persist();
     logger.info('[DBConnectionManager] 更新连接成功: %s', connection.name);
     return connection;
@@ -229,14 +214,14 @@ export class DBConnectionManager {
 
   /**
    * 删除连接配置
-   * @param id 连接 ID
+   * @param name 连接名称
    */
-  public async deleteConnection(id: string): Promise<boolean> {
+  public async deleteConnection(name: string): Promise<boolean> {
     this.ensureInitialized();
 
-    const index = this.connections.findIndex(conn => conn.id === id);
+    const index = this.connections.findIndex(conn => conn.name === name);
     if (index === -1) {
-      logger.warn('[DBConnectionManager] 未找到连接: %s', id);
+      logger.warn('[DBConnectionManager] 未找到连接: %s', name);
       return false;
     }
 
@@ -250,20 +235,19 @@ export class DBConnectionManager {
 
   /**
    * 设置默认连接
-   * @param id 连接 ID
+   * @param name 连接名称
    */
-  public async setDefaultConnection(id: string): Promise<boolean> {
+  public async setDefaultConnection(name: string): Promise<boolean> {
     this.ensureInitialized();
 
-    const connection = this.connections.find(conn => conn.id === id);
+    const connection = this.connections.find(conn => conn.name === name);
     if (!connection) {
-      logger.warn('[DBConnectionManager] 未找到连接: %s', id);
+      logger.warn('[DBConnectionManager] 未找到连接: %s', name);
       return false;
     }
 
     this.clearDefaultFlag();
     connection.isDefault = true;
-    connection.updatedAt = new Date().toISOString();
 
     await this.persist();
     logger.info('[DBConnectionManager] 设置默认连接成功: %s', connection.name);
@@ -305,20 +289,18 @@ export class DBConnectionManager {
    */
   public exportToJSON(): string {
     this.ensureInitialized();
-    return JSON.stringify({
-      version: '1.0.0',
+    return JSON5.stringify({
       connections: this.connections,
-      lastUpdated: new Date().toISOString(),
     }, null, 2);
   }
 
   /**
-   * 从 JSON 字符串导入配置（会覆盖现有配置）
-   * @param jsonString JSON 字符串
+   * 从 JSON/JSON5 字符串导入配置（会覆盖现有配置）
+   * @param jsonString JSON/JSON5 字符串
    */
   public async importFromJSON(jsonString: string): Promise<void> {
     try {
-      const data = JSON.parse(jsonString) as DBConnectionsFile;
+      const data = JSON5.parse(jsonString) as DBConnectionsFile;
       if (!data.connections || !Array.isArray(data.connections)) {
         throw new Error('无效的连接配置文件格式');
       }
@@ -348,7 +330,7 @@ export class DBConnectionManager {
   private async loadFromFile(): Promise<void> {
     try {
       const data = await fs.promises.readFile(this.configFilePath, 'utf-8');
-      const parsed = JSON.parse(data) as DBConnectionsFile;
+      const parsed = JSON5.parse(data) as DBConnectionsFile;
       this.connections = parsed.connections || [];
     } catch (error) {
       logger.error(error, '[DBConnectionManager] 加载配置文件失败');
@@ -361,9 +343,7 @@ export class DBConnectionManager {
    */
   private async persist(): Promise<void> {
     const data: DBConnectionsFile = {
-      version: '1.0.0',
       connections: this.connections,
-      lastUpdated: new Date().toISOString(),
     };
     await this.saveToFile(data);
   }
@@ -374,16 +354,9 @@ export class DBConnectionManager {
   private async saveToFile(data: DBConnectionsFile): Promise<void> {
     await fs.promises.writeFile(
       this.configFilePath,
-      JSON.stringify(data, null, 2),
+      JSON5.stringify(data, null, 2),
       'utf-8'
     );
-  }
-
-  /**
-   * 生成唯一 ID
-   */
-  private generateId(): string {
-    return `conn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**

@@ -1,0 +1,14 @@
+{
+  "tables" /*需要同步的表名列表*/: [
+    "gzcb_t", 
+    "gzcbl_t",
+    "gzsy_t", 
+    "gzsz_t", 
+    "gzszl_t",
+    "gzza_t", 
+    "gzzal_t",
+    "gzzj_t", 
+    "gzzol_t",
+    "gzzz_t", 
+  ],
+}

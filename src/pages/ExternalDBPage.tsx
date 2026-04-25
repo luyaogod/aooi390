@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { cn } from '@/lib/utils'
 
 import {
   Card,
@@ -33,13 +32,13 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import {
   Plug,
   Download,
+  Loader2,
   AlertCircle,
   CheckCircle2,
   XCircle,
 } from 'lucide-react'
 
 interface ExternalDBConnection {
-  id: string
   name: string
   type: 'kingbase' | 'oracle'
   isDefault?: boolean
@@ -70,7 +69,7 @@ interface SyncAllResult {
 
 function ExternalDBPage() {
   const [connections, setConnections] = useState<ExternalDBConnection[]>([])
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string>('')
+  const [selectedConnectionName, setSelectedConnectionName] = useState<string>('')
   const [externalLoading, setExternalLoading] = useState(false)
   const [externalResult, setExternalResult] = useState<ExternalDBTestResult | null>(null)
   const [connectionsLoading, setConnectionsLoading] = useState(true)
@@ -88,9 +87,9 @@ function ExternalDBPage() {
         setConnections(result.connections)
         const defaultConn = result.connections.find(c => c.isDefault)
         if (defaultConn) {
-          setSelectedConnectionId(defaultConn.id)
+          setSelectedConnectionName(defaultConn.name)
         } else if (result.connections.length > 0) {
-          setSelectedConnectionId(result.connections[0].id)
+          setSelectedConnectionName(result.connections[0].name)
         }
       }
     } catch (err) {
@@ -101,11 +100,11 @@ function ExternalDBPage() {
   }
 
   const testExternalConnection = async () => {
-    if (!selectedConnectionId) return
+    if (!selectedConnection) return
     setExternalLoading(true)
     setExternalResult(null)
     try {
-      const result = await window.electronAPI.testExternalDBConnection(selectedConnectionId)
+      const result = await window.electronAPI.testExternalDBConnection(selectedConnectionName)
       setExternalResult(result)
     } catch (err) {
       setExternalResult({
@@ -154,10 +153,10 @@ function ExternalDBPage() {
     fetchSyncTables()
   }, [])
 
-  const selectedConnection = connections.find(c => c.id === selectedConnectionId)
+  const selectedConnection = connections.find(c => c.name === selectedConnectionName)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 max-w-2xl">
       {/* 外部数据库卡片 */}
       <Card>
         <CardHeader>
@@ -166,7 +165,10 @@ function ExternalDBPage() {
           {externalResult && (
             <CardAction>
               <Badge
-                variant={externalResult.connected ? 'default' : 'destructive'}
+                className={externalResult.connected
+                  ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
+                  : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+                }
               >
                 {externalResult.connected ? '已连接' : '未连接'}
               </Badge>
@@ -190,10 +192,10 @@ function ExternalDBPage() {
               <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                 <span className="text-muted-foreground">选择连接</span>
                 <Select
-                  value={selectedConnectionId}
+                  value={selectedConnectionName}
                   onValueChange={(value) => {
                     if (value) {
-                      setSelectedConnectionId(value)
+                      setSelectedConnectionName(value)
                       setExternalResult(null)
                     }
                   }}
@@ -204,9 +206,8 @@ function ExternalDBPage() {
                   <SelectContent>
                     <SelectGroup>
                       {connections.map((conn) => (
-                        <SelectItem key={conn.id} value={conn.id}>
+                        <SelectItem key={conn.name} value={conn.name}>
                           {conn.name}
-                          {conn.isDefault ? ' (默认)' : ''}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -268,7 +269,10 @@ function ExternalDBPage() {
           {syncResult && (
             <CardAction>
               <Badge
-                variant={syncResult.success ? 'default' : 'destructive'}
+                className={syncResult.success
+                  ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
+                  : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+                }
               >
                 {syncResult.success ? '成功' : '失败'}
               </Badge>
@@ -334,12 +338,12 @@ function ExternalDBPage() {
                             <TableCell>{r.insertedCount}</TableCell>
                             <TableCell>
                               {r.success ? (
-                                <Badge variant="default" className="gap-1">
+                                <Badge className="gap-1 bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
                                   <CheckCircle2 className="size-3" />
                                   成功
                                 </Badge>
                               ) : (
-                                <Badge variant="destructive" className="gap-1">
+                                <Badge className="gap-1 bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300">
                                   <XCircle className="size-3" />
                                   失败
                                 </Badge>
@@ -364,7 +368,10 @@ function ExternalDBPage() {
             disabled={syncLoading || syncTables.length === 0}
             className="gap-1.5"
           >
-            <Download className={cn('size-3.5', syncLoading && 'animate-spin')} />
+            {syncLoading
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <Download className="size-3.5" />
+            }
             {syncLoading ? '拉取中...' : '开始拉取'}
           </Button>
         </CardFooter>

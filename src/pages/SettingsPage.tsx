@@ -9,7 +9,7 @@ import { Settings } from 'lucide-react'
 
 function SettingsPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 max-w-2xl">
       <Card>
         <CardHeader>
           <CardTitle>系统设置</CardTitle>

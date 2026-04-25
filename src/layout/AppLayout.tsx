@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import {
   Database,
   Server,
+  GitBranch,
   Settings,
 } from 'lucide-react'
 
@@ -25,6 +26,11 @@ const navItems: NavItem[] = [
     path: '/external-db',
     label: '外部数据库',
     icon: <Server className="size-4" />,
+  },
+  {
+    path: '/ent-sync',
+    label: '同步流程图',
+    icon: <GitBranch className="size-4" />,
   },
   {
     path: '/settings',

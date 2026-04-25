@@ -54,7 +54,7 @@ function AppDBPage() {
   }, [])
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 max-w-2xl">
       {/* SQLite 本地数据库卡片 */}
       <Card>
         <CardHeader>
@@ -62,7 +62,10 @@ function AppDBPage() {
           <CardDescription>查看内置 SQLite 数据库的连接状态与路径信息</CardDescription>
           <CardAction>
             <Badge
-              variant={sqliteStatus?.connected ? 'default' : 'destructive'}
+              className={sqliteStatus?.connected
+                ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
+                : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+              }
             >
               {sqliteStatus?.connected ? '已连接' : '未连接'}
             </Badge>

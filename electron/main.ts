@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { appDB, externalDB } from './db/clients'
 import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
 import { dbSyncService } from './core/sync-service'
+import { entSyncService } from './core/ent-sync-service'
 import logger from './utils/logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -40,6 +41,9 @@ function createWindow() {
 
   win.maximize()
   win.show()
+
+  // 隐藏默认菜单栏（File Edit View Window Help）
+  Menu.setApplicationMenu(null)
 
   // Test active push message to Renderer-process.
   win.webContents.on('did-finish-load', () => {
@@ -100,7 +104,6 @@ ipcMain.handle('db:get-external-connections', async () => {
     return {
       success: true,
       connections: connections.map(conn => ({
-        id: conn.id,
         name: conn.name,
         type: conn.type,
         isDefault: conn.isDefault,
@@ -118,10 +121,10 @@ ipcMain.handle('db:get-external-connections', async () => {
 })
 
 // IPC: 测试外部数据库连接
-ipcMain.handle('db:test-external-connection', async (_event, connectionId: string) => {
+ipcMain.handle('db:test-external-connection', async (_event, connectionName: string) => {
   try {
     await dbConnectionManager.initialize()
-    const connection = dbConnectionManager.getConnectionById(connectionId)
+    const connection = dbConnectionManager.getConnectionByName(connectionName)
 
     if (!connection) {
       return {
@@ -191,6 +194,54 @@ ipcMain.handle('db:sync-all-tables', async () => {
     return result
   } catch (error) {
     logger.error(error, '[Main] 同步失败')
+    return {
+      success: false,
+      results: [],
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+})
+
+// IPC: 获取ENT同步表配置
+ipcMain.handle('ent:get-sync-tables', async () => {
+  try {
+    const tables = entSyncService.getSyncTables()
+    return { success: true, tables }
+  } catch (error) {
+    logger.error(error, '[Main] 获取ENT同步表配置失败')
+    return { success: false, error: String(error), tables: [] }
+  }
+})
+
+// IPC: 获取ENT编号列表
+ipcMain.handle('ent:get-ent-list', async () => {
+  try {
+    const entList = await entSyncService.getEntList()
+    return { success: true, entList }
+  } catch (error) {
+    logger.error(error, '[Main] 获取ENT列表失败')
+    return { success: false, error: String(error), entList: [] }
+  }
+})
+
+// IPC: ENT同步预览（查询源ENT数据条数）
+ipcMain.handle('ent:preview', async (_event, sourceEnt: number) => {
+  try {
+    const preview = await entSyncService.preview(sourceEnt)
+    return { success: true, preview }
+  } catch (error) {
+    logger.error(error, '[Main] ENT同步预览失败')
+    return { success: false, error: String(error), preview: [] }
+  }
+})
+
+// IPC: 执行ENT同步
+ipcMain.handle('ent:sync-all', async (_event, sourceEnt: number, targetEnt: number) => {
+  try {
+    const result = await entSyncService.syncAll(sourceEnt, targetEnt)
+    return result
+  } catch (error) {
+    logger.error(error, '[Main] ENT同步失败')
     return {
       success: false,
       results: [],
