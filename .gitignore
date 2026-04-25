@@ -28,3 +28,4 @@ dist-ssr
 sources/
 release/
 dist-electron/
+.agents/

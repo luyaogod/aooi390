@@ -11,5 +11,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 
 // 接收主进程消息
 window.electronAPI.on('main-process-message', (message) => {
+  // eslint-disable-next-line no-console
   console.log(message)
 })
