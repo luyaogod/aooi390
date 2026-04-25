@@ -9,6 +9,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getExternalDBConnections: () => ipcRenderer.invoke('db:get-external-connections'),
   testExternalDBConnection: (connectionId: string) => ipcRenderer.invoke('db:test-external-connection', connectionId),
 
+  // 数据同步 API
+  getSyncTables: () => ipcRenderer.invoke('db:get-sync-tables'),
+  syncAllTables: () => ipcRenderer.invoke('db:sync-all-tables'),
+
   // 通用 IPC（保留原有能力）
   on(channel: string, listener: (...args: unknown[]) => void) {
     return ipcRenderer.on(channel, (_event, ...args) => listener(...args))

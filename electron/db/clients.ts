@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import * as oracledb from 'oracledb';
-import { getDatabasePath } from '../utils/paths';
+import { getSqliteDBPath } from '../utils/paths';
+import logger from '../utils/logger';
 
 // ==================== 类型定义 ====================
 
@@ -58,16 +59,16 @@ export class AppDBManager {
   private _isConnected: boolean = false;
 
   private constructor() {
-    // 确保 DATABASE_URL 环境变量已设置
-    // 开发环境从 .env 读取，打包环境通过 pathManager 计算实际路径
-    if (!process.env.DATABASE_URL) {
-      const dbPath = getDatabasePath().replace(/\\/g, '/');
-      process.env.DATABASE_URL = `file:${dbPath}`;
-      console.log('[AppDBManager] DATABASE_URL set to:', process.env.DATABASE_URL);
-    }
+    const dbPath = getSqliteDBPath().replace(/\\/g, '/')
+    // Prisma SQLite Windows 路径格式：使用 file: 前缀 + 正斜杠绝对路径
+    const dbUrl = `file:${dbPath}`
 
-    // 初始化 Prisma Client
     this.prisma = new PrismaClient({
+      datasources: {
+        db: {
+          url: dbUrl,
+        },
+      },
       log: process.env.NODE_ENV === 'development'
         ? ['query', 'info', 'warn', 'error']
         : ['error'],
@@ -105,10 +106,10 @@ export class AppDBManager {
     try {
       await this.prisma.$connect();
       this._isConnected = true;
-      console.log('[AppDBManager] SQLite database connected successfully');
+      logger.info('[AppDBManager] SQLite database connected successfully');
     } catch (error) {
       this._isConnected = false;
-      console.error('[AppDBManager] Database connection failed:', error);
+      logger.error(error, '[AppDBManager] Database connection failed');
       throw error;
     }
   }
@@ -119,7 +120,7 @@ export class AppDBManager {
   public async disconnect(): Promise<void> {
     await this.prisma.$disconnect();
     this._isConnected = false;
-    console.log('[AppDBManager] Database connection closed');
+    logger.info('[AppDBManager] Database connection closed');
   }
 
   /**
@@ -130,8 +131,8 @@ export class AppDBManager {
       await this.prisma.$queryRaw`SELECT 1`;
       return true;
     } catch (error) {
-      console.error('[AppDBManager] Health check failed:', error);
-      return false;
+      logger.error(error, '[AppDBManager] Health check failed');
+      throw error;
     }
   }
 
@@ -139,24 +140,24 @@ export class AppDBManager {
    * 测试连接状态并打印详细信息到控制台
    */
   public async testConnection(): Promise<void> {
-    console.log('========================================');
-    console.log('[AppDBManager] Starting SQLite connection test...');
-    console.log('[AppDBManager] Connection status:', this._isConnected ? 'Connected' : 'Disconnected');
+    logger.info('========================================');
+    logger.info('[AppDBManager] Starting SQLite connection test...');
+    logger.info('[AppDBManager] Connection status: %s', this._isConnected ? 'Connected' : 'Disconnected');
 
     try {
       const startTime = Date.now();
       await this.prisma.$queryRaw`SELECT 1`;
       const duration = Date.now() - startTime;
 
-      console.log('[AppDBManager] Connection test successful');
-      console.log('[AppDBManager] Response time:', duration, 'ms');
-      console.log('[AppDBManager] Prisma Client status: Normal');
+      logger.info('[AppDBManager] Connection test successful');
+      logger.info('[AppDBManager] Response time: %d ms', duration);
+      logger.info('[AppDBManager] Prisma Client status: Normal');
     } catch (error) {
-      console.error('[AppDBManager] Connection test failed');
-      console.error('[AppDBManager] Error:', error);
+      logger.error('[AppDBManager] Connection test failed');
+      logger.error(error, '[AppDBManager] Error');
     }
 
-    console.log('========================================');
+    logger.info('========================================');
   }
 }
 
@@ -229,17 +230,17 @@ export class ExternalDBManager {
     if (this._isConnected && this._dbType === dbConfig.type) {
       const isSameConfig = this.isSameConfig(dbConfig.type, dbConfig.config);
       if (isSameConfig) {
-        console.log(`[ExternalDBManager] ${dbConfig.type} 数据库已连接，配置相同，跳过连接`);
+        logger.info('[ExternalDBManager] %s 数据库已连接，配置相同，跳过连接', dbConfig.type);
         return;
       }
       // 配置不同，先断开再重新连接
-      console.log(`[ExternalDBManager] ${dbConfig.type} 配置变更，重新连接`);
+      logger.info('[ExternalDBManager] %s 配置变更，重新连接', dbConfig.type);
       await this.disconnect();
     }
 
     // 如果已连接其他类型数据库，先断开
     if (this._isConnected && this._dbType !== dbConfig.type) {
-      console.log(`[ExternalDBManager] 切换数据库类型: ${this._dbType} -> ${dbConfig.type}`);
+      logger.info('[ExternalDBManager] 切换数据库类型: %s -> %s', this._dbType, dbConfig.type);
       await this.disconnect();
     }
 
@@ -271,14 +272,14 @@ export class ExternalDBManager {
       await this.kingbasePool.end();
       this.kingbasePool = null;
       this.kingbaseConfig = null;
-      console.log('[ExternalDBManager] Kingbase 数据库连接已断开');
+      logger.info('[ExternalDBManager] Kingbase 数据库连接已断开');
     }
 
     if (this.oraclePool) {
       await this.oraclePool.close(0);
       this.oraclePool = null;
       this.oracleConfig = null;
-      console.log('[ExternalDBManager] Oracle 数据库连接已断开');
+      logger.info('[ExternalDBManager] Oracle 数据库连接已断开');
     }
 
     this._dbType = null;
@@ -302,7 +303,7 @@ export class ExternalDBManager {
       }
       return true;
     } catch (error) {
-      console.error('[ExternalDBManager] 健康检查失败:', error);
+      logger.error(error, '[ExternalDBManager] 健康检查失败');
       return false;
     }
   }
@@ -311,14 +312,14 @@ export class ExternalDBManager {
    * 测试连接状态并打印详细信息到控制台
    */
   public async testConnection(): Promise<void> {
-    console.log('========================================');
-    console.log('[ExternalDBManager] 开始测试外部数据库连接...');
-    console.log('[ExternalDBManager] 连接状态:', this._isConnected ? '已连接' : '未连接');
-    console.log('[ExternalDBManager] 当前数据库类型:', this._dbType || '无');
+    logger.info('========================================');
+    logger.info('[ExternalDBManager] 开始测试外部数据库连接...');
+    logger.info('[ExternalDBManager] 连接状态: %s', this._isConnected ? '已连接' : '未连接');
+    logger.info('[ExternalDBManager] 当前数据库类型: %s', this._dbType || '无');
 
     if (!this._isConnected || !this._dbType) {
-      console.log('[ExternalDBManager] ⚠️ 数据库未连接，跳过测试');
-      console.log('========================================');
+      logger.info('[ExternalDBManager] 数据库未连接，跳过测试');
+      logger.info('========================================');
       return;
     }
 
@@ -329,31 +330,31 @@ export class ExternalDBManager {
         const result = await this.queryKingbase('SELECT version()');
         const duration = Date.now() - startTime;
 
-        console.log('[ExternalDBManager] ✅ Kingbase 连接测试成功');
-        console.log('[ExternalDBManager] 响应时间:', duration, 'ms');
-        console.log('[ExternalDBManager] 数据库版本:', result.rows[0]?.version || '未知');
-        console.log('[ExternalDBManager] 连接配置:');
-        console.log('  - 主机:', this.kingbaseConfig?.host);
-        console.log('  - 端口:', this.kingbaseConfig?.port);
-        console.log('  - 数据库:', this.kingbaseConfig?.database);
-        console.log('  - 用户:', this.kingbaseConfig?.user);
+        logger.info('[ExternalDBManager] Kingbase 连接测试成功');
+        logger.info('[ExternalDBManager] 响应时间: %d ms', duration);
+        logger.info('[ExternalDBManager] 数据库版本: %s', result.rows[0]?.version || '未知');
+        logger.info('[ExternalDBManager] 连接配置:');
+        logger.info('  - 主机: %s', this.kingbaseConfig?.host);
+        logger.info('  - 端口: %s', this.kingbaseConfig?.port);
+        logger.info('  - 数据库: %s', this.kingbaseConfig?.database);
+        logger.info('  - 用户: %s', this.kingbaseConfig?.user);
       } else {
         const result = await this.queryOracle('SELECT * FROM v$version');
         const duration = Date.now() - startTime;
 
-        console.log('[ExternalDBManager] ✅ Oracle 连接测试成功');
-        console.log('[ExternalDBManager] 响应时间:', duration, 'ms');
-        console.log('[ExternalDBManager] 数据库版本:', result.rows?.[0] || '未知');
-        console.log('[ExternalDBManager] 连接配置:');
-        console.log('  - 连接字符串:', this.oracleConfig?.connectString);
-        console.log('  - 用户:', this.oracleConfig?.user);
+        logger.info('[ExternalDBManager] Oracle 连接测试成功');
+        logger.info('[ExternalDBManager] 响应时间: %d ms', duration);
+        logger.info('[ExternalDBManager] 数据库版本: %o', result.rows?.[0] || '未知');
+        logger.info('[ExternalDBManager] 连接配置:');
+        logger.info('  - 连接字符串: %s', this.oracleConfig?.connectString);
+        logger.info('  - 用户: %s', this.oracleConfig?.user);
       }
     } catch (error) {
-      console.error('[ExternalDBManager] ❌ 连接测试失败');
-      console.error('[ExternalDBManager] 错误信息:', error);
+      logger.error('[ExternalDBManager] 连接测试失败');
+      logger.error(error, '[ExternalDBManager] 错误信息');
     }
 
-    console.log('========================================');
+    logger.info('========================================');
   }
 
   // ==================== Kingbase 相关方法 ====================
@@ -377,7 +378,7 @@ export class ExternalDBManager {
       this.kingbasePool = new Pool(poolConfig);
 
       this.kingbasePool.on('error', (err: Error) => {
-        console.error('[ExternalDBManager] Kingbase 连接池错误:', err);
+        logger.error(err, '[ExternalDBManager] Kingbase 连接池错误');
       });
 
       // 测试连接
@@ -390,8 +391,8 @@ export class ExternalDBManager {
       this._isConnected = true;
       this._currentConfig = config;
 
-      console.log('[ExternalDBManager] Kingbase 数据库连接成功');
-      console.log('[ExternalDBManager] 数据库版本:', result.rows[0].version);
+      logger.info('[ExternalDBManager] Kingbase 数据库连接成功');
+      logger.info('[ExternalDBManager] 数据库版本: %s', result.rows[0].version);
     } catch (error) {
       this.kingbasePool = null;
       throw error;
@@ -466,8 +467,8 @@ export class ExternalDBManager {
       this._isConnected = true;
       this._currentConfig = config;
 
-      console.log('[ExternalDBManager] Oracle 数据库连接成功');
-      console.log('[ExternalDBManager] 数据库版本:', result.rows?.[0]);
+      logger.info('[ExternalDBManager] Oracle 数据库连接成功');
+      logger.info('[ExternalDBManager] 数据库版本: %s', result.rows?.[0]);
     } catch (error) {
       this.oraclePool = null;
       throw error;

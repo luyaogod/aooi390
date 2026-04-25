@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { appDB, externalDB } from './db/clients'
-import { getDatabasePath } from './utils/paths'
+import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
+import { dbSyncService } from './core/sync-service'
+import logger from './utils/logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -74,7 +76,7 @@ ipcMain.handle('db:get-sqlite-status', async () => {
       connected: isHealthy,
       status: isHealthy ? '已连接' : '未连接',
       dbType: 'SQLite',
-      dbPath: getDatabasePath(),
+      dbPath: getSqliteDBPath(),
     }
   } catch (error) {
     return {
@@ -102,7 +104,7 @@ ipcMain.handle('db:get-external-connections', async () => {
       })),
     }
   } catch (error) {
-    console.error('[Main] 获取外部数据库连接配置失败:', error)
+    logger.error(error, '[Main] 获取外部数据库连接配置失败')
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
@@ -158,10 +160,36 @@ ipcMain.handle('db:test-external-connection', async (_event, connectionId: strin
       }
     }
   } catch (error) {
-    console.error('[Main] 测试外部数据库连接失败:', error)
+    logger.error(error, '[Main] 测试外部数据库连接失败')
     return {
       success: false,
       connected: false,
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+})
+
+// IPC: 获取同步表列表
+ipcMain.handle('db:get-sync-tables', async () => {
+  try {
+    const tables = await dbSyncService.getSyncTables()
+    return { success: true, tables }
+  } catch (error) {
+    logger.error(error, '[Main] 获取同步表列表失败')
+    return { success: false, error: String(error), tables: [] }
+  }
+})
+
+// IPC: 同步所有配置的表
+ipcMain.handle('db:sync-all-tables', async () => {
+  try {
+    const result = await dbSyncService.syncAll()
+    return result
+  } catch (error) {
+    logger.error(error, '[Main] 同步失败')
+    return {
+      success: false,
+      results: [],
       message: error instanceof Error ? error.message : String(error),
     }
   }
@@ -171,11 +199,13 @@ app.whenReady().then(async () => {
   createWindow()
 
   // Test appDB (SQLite) connection
-  console.log('[Main] Starting database connection test...')
+  logger.info('[Main] Starting database connection test...')
   try {
     await appDB.connect()
     await appDB.testConnection()
   } catch (error) {
-    console.error('[Main] appDB connection test failed:', error)
+    const msg = error instanceof Error ? error.message : String(error)
+    logger.error(error, '[Main] appDB connection test failed')
+    dialog.showErrorBox('SQLite 数据库连接失败', msg)
   }
 })

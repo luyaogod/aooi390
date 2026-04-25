@@ -30,10 +30,26 @@ interface ExternalDBTestResult {
   name?: string
 }
 
+interface SyncResult {
+  tableName: string
+  success: boolean
+  sourceCount: number
+  insertedCount: number
+  error?: string
+}
+
+interface SyncAllResult {
+  success: boolean
+  results: SyncResult[]
+  message: string
+}
+
 interface ElectronAPI {
   getSQLiteStatus: () => Promise<SQLiteStatus>
   getExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
   testExternalDBConnection: (connectionId: string) => Promise<ExternalDBTestResult>
+  getSyncTables: () => Promise<{ success: boolean; tables: string[]; error?: string }>
+  syncAllTables: () => Promise<SyncAllResult>
   on: (channel: string, listener: (...args: unknown[]) => void) => void
   off: (channel: string, listener: (...args: unknown[]) => void) => void
 }

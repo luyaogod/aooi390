@@ -29,9 +29,17 @@ class PathManager {
     /**
      * 获取 SQLite 数据库路径
      */
-    public getDatabasePath(): string {
+    public getSqliteDBPath(): string {
         return path.join(this.getAppDataRoot(), 'database', 'app.db');
     }
+
+    /**
+     * 获取日志目录路径
+     */
+    public getLogsPath(): string {
+        return path.join(this.getAppDataRoot(), 'logs');
+    }
+
 
     /**
      * 获取配置文件路径
@@ -52,6 +60,7 @@ class PathManager {
 export const pathManager = new PathManager();
 
 // 导出便捷方法
-export const getDatabasePath = (): string => pathManager.getDatabasePath();
+export const getSqliteDBPath = (): string => pathManager.getSqliteDBPath();
 export const getConfigPath = (): string => pathManager.getConfigPath();
 export const getConfigFile = (fileName: string): string => pathManager.getConfigFile(fileName);
+export const getLogsPath = (): string => pathManager.getLogsPath();

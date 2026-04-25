@@ -184,6 +184,58 @@ h1 {
   background: #bfbfbf;
 }
 
+/* 同步按钮样式 */
+.sync-btn {
+  background: #faad14;
+}
+
+.sync-btn:hover {
+  background: #ffc53d;
+}
+
+.sync-btn:disabled {
+  background: #ffe58f;
+}
+
+/* 同步明细表格 */
+.sync-detail {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.sync-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.sync-table th,
+.sync-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sync-table th {
+  background: #fafafa;
+  font-weight: 600;
+  color: #595959;
+}
+
+.sync-table tr.error-row {
+  background: #fff2f0;
+}
+
+.sync-table td.success {
+  color: #52c41a;
+  font-weight: 500;
+}
+
+.sync-table td.error {
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
 /* 卡片间距 */
 .card + .card {
   margin-top: 20px;

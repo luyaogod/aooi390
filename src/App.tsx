@@ -25,6 +25,20 @@ interface ExternalDBTestResult {
   name?: string
 }
 
+interface SyncResult {
+  tableName: string
+  success: boolean
+  sourceCount: number
+  insertedCount: number
+  error?: string
+}
+
+interface SyncAllResult {
+  success: boolean
+  results: SyncResult[]
+  message: string
+}
+
 function App() {
   // SQLite 状态
   const [sqliteStatus, setSqliteStatus] = useState<SQLiteStatus | null>(null)
@@ -36,6 +50,12 @@ function App() {
   const [externalLoading, setExternalLoading] = useState(false)
   const [externalResult, setExternalResult] = useState<ExternalDBTestResult | null>(null)
   const [connectionsLoading, setConnectionsLoading] = useState(true)
+
+  // 同步状态
+  const [syncTables, setSyncTables] = useState<string[]>([])
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null)
+  const [syncTablesLoading, setSyncTablesLoading] = useState(true)
 
   const fetchSQLiteStatus = async () => {
     setSqliteLoading(true)
@@ -61,15 +81,12 @@ function App() {
       const result = await window.electronAPI.getExternalDBConnections()
       if (result.success) {
         setConnections(result.connections)
-        // 默认选中第一个或默认连接
         const defaultConn = result.connections.find(c => c.isDefault)
         if (defaultConn) {
           setSelectedConnectionId(defaultConn.id)
         } else if (result.connections.length > 0) {
           setSelectedConnectionId(result.connections[0].id)
         }
-      } else {
-        console.error('获取连接配置失败:', result.error)
       }
     } catch (err) {
       console.error('获取连接配置失败:', err)
@@ -96,9 +113,41 @@ function App() {
     }
   }
 
+  const fetchSyncTables = async () => {
+    setSyncTablesLoading(true)
+    try {
+      const result = await window.electronAPI.getSyncTables()
+      if (result.success) {
+        setSyncTables(result.tables)
+      }
+    } catch (err) {
+      console.error('获取同步表列表失败:', err)
+    } finally {
+      setSyncTablesLoading(false)
+    }
+  }
+
+  const syncAllTables = async () => {
+    setSyncLoading(true)
+    setSyncResult(null)
+    try {
+      const result = await window.electronAPI.syncAllTables()
+      setSyncResult(result)
+    } catch (err) {
+      setSyncResult({
+        success: false,
+        results: [],
+        message: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setSyncLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchSQLiteStatus()
     fetchConnections()
+    fetchSyncTables()
   }, [])
 
   const selectedConnection = connections.find(c => c.id === selectedConnectionId)
@@ -213,6 +262,76 @@ function App() {
           disabled={externalLoading || connections.length === 0}
         >
           {externalLoading ? '测试中...' : '测试连接'}
+        </button>
+      </div>
+
+      {/* 数据同步卡片 */}
+      <div className={`card ${syncResult?.success ? 'connected' : syncResult ? 'disconnected' : ''}`}>
+        <div className="card-header">
+          <span className={`status-dot ${syncResult?.success ? 'green' : syncResult ? 'red' : 'gray'}`} />
+          <h2>数据同步</h2>
+        </div>
+
+        {syncTablesLoading ? (
+          <p className="loading">正在加载同步配置...</p>
+        ) : syncTables.length === 0 ? (
+          <p className="loading">未配置同步表</p>
+        ) : (
+          <div className="card-body">
+            <div className="info-row">
+              <span className="label">同步表数：</span>
+              <span className="value">{syncTables.length} 张</span>
+            </div>
+            <div className="info-row">
+              <span className="label">表名列表：</span>
+              <span className="value path">{syncTables.join(', ')}</span>
+            </div>
+
+            {syncResult && (
+              <div className={`test-result ${syncResult.success ? '' : 'error'}`}>
+                <div className="info-row">
+                  <span className="label">同步结果：</span>
+                  <span className={`value ${syncResult.success ? 'success' : 'error'}`}>
+                    {syncResult.message}
+                  </span>
+                </div>
+                {syncResult.results.length > 0 && (
+                  <div className="sync-detail">
+                    <table className="sync-table">
+                      <thead>
+                        <tr>
+                          <th>表名</th>
+                          <th>源数据</th>
+                          <th>插入数</th>
+                          <th>状态</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {syncResult.results.map((r) => (
+                          <tr key={r.tableName} className={r.success ? '' : 'error-row'}>
+                            <td>{r.tableName}</td>
+                            <td>{r.sourceCount}</td>
+                            <td>{r.insertedCount}</td>
+                            <td className={r.success ? 'success' : 'error'}>
+                              {r.success ? '成功' : `失败${r.error ? ': ' + r.error.substring(0, 30) : ''}`}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <button
+          className="refresh-btn sync-btn"
+          onClick={syncAllTables}
+          disabled={syncLoading || syncTables.length === 0}
+        >
+          {syncLoading ? '同步中...' : '开始同步'}
         </button>
       </div>
     </div>

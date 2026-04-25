@@ -42,6 +42,36 @@ npm run preview
 npm run lint
 ```
 
+### Prisma 数据库命令
+
+```bash
+# 根据 schema.prisma 生成 Prisma Client（build 脚本已自动包含）
+npx prisma generate
+
+# 将 schema 直接推送到数据库（快速同步，不生成迁移文件）
+npx prisma db push
+
+# 创建新的迁移并应用到开发数据库
+npx prisma migrate dev --name <迁移名称>
+
+# 查看迁移状态
+npx prisma migrate status
+
+# 应用待处理的迁移（生产/打包环境使用）
+npx prisma migrate deploy
+
+# 打开 Prisma Studio 可视化数据库管理界面
+npx prisma studio
+
+# 重新产生数据库
+npx prisma migrate reset
+
+# 初始化
+npx prisma migrate dev --name init
+```
+
+> **注意**：`prisma/schema.prisma` 文件必须保存为 **UTF-8 无 BOM** 格式，否则 Prisma CLI 会报 `P1012` 解析错误。
+
 ---
 
 ## 打包输出

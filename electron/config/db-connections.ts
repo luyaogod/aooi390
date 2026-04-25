@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { pathManager } from '../utils/paths';
+import logger from '../utils/logger';
 import type { ExternalDBType, KingbaseConfig, OracleConfig } from '../db/clients';
 
 // ==================== 类型定义 ====================
@@ -116,9 +117,9 @@ export class DBConnectionManager {
       // 加载配置
       await this.loadFromFile();
       this.initialized = true;
-      console.log('[DBConnectionManager] 初始化成功，配置文件路径:', this.configFilePath);
+      logger.info('[DBConnectionManager] 初始化成功，配置文件路径: %s', this.configFilePath);
     } catch (error) {
-      console.error('[DBConnectionManager] 初始化失败:', error);
+      logger.error(error, '[DBConnectionManager] 初始化失败');
       throw error;
     }
   }
@@ -187,7 +188,7 @@ export class DBConnectionManager {
     this.connections.push(connection);
     await this.persist();
 
-    console.log('[DBConnectionManager] 创建连接成功:', connection.name);
+    logger.info('[DBConnectionManager] 创建连接成功: %s', connection.name);
     return connection;
   }
 
@@ -201,7 +202,7 @@ export class DBConnectionManager {
 
     const index = this.connections.findIndex(conn => conn.id === id);
     if (index === -1) {
-      console.warn('[DBConnectionManager] 未找到连接:', id);
+      logger.warn('[DBConnectionManager] 未找到连接: %s', id);
       return null;
     }
 
@@ -222,7 +223,7 @@ export class DBConnectionManager {
     connection.updatedAt = new Date().toISOString();
 
     await this.persist();
-    console.log('[DBConnectionManager] 更新连接成功:', connection.name);
+    logger.info('[DBConnectionManager] 更新连接成功: %s', connection.name);
     return connection;
   }
 
@@ -235,7 +236,7 @@ export class DBConnectionManager {
 
     const index = this.connections.findIndex(conn => conn.id === id);
     if (index === -1) {
-      console.warn('[DBConnectionManager] 未找到连接:', id);
+      logger.warn('[DBConnectionManager] 未找到连接: %s', id);
       return false;
     }
 
@@ -243,7 +244,7 @@ export class DBConnectionManager {
     this.connections.splice(index, 1);
     await this.persist();
 
-    console.log('[DBConnectionManager] 删除连接成功:', connection.name);
+    logger.info('[DBConnectionManager] 删除连接成功: %s', connection.name);
     return true;
   }
 
@@ -256,7 +257,7 @@ export class DBConnectionManager {
 
     const connection = this.connections.find(conn => conn.id === id);
     if (!connection) {
-      console.warn('[DBConnectionManager] 未找到连接:', id);
+      logger.warn('[DBConnectionManager] 未找到连接: %s', id);
       return false;
     }
 
@@ -265,7 +266,7 @@ export class DBConnectionManager {
     connection.updatedAt = new Date().toISOString();
 
     await this.persist();
-    console.log('[DBConnectionManager] 设置默认连接成功:', connection.name);
+    logger.info('[DBConnectionManager] 设置默认连接成功: %s', connection.name);
     return true;
   }
 
@@ -323,9 +324,9 @@ export class DBConnectionManager {
       }
       this.connections = data.connections;
       await this.persist();
-      console.log('[DBConnectionManager] 导入配置成功，共', this.connections.length, '个连接');
+      logger.info('[DBConnectionManager] 导入配置成功，共 %d 个连接', this.connections.length);
     } catch (error) {
-      console.error('[DBConnectionManager] 导入配置失败:', error);
+      logger.error(error, '[DBConnectionManager] 导入配置失败');
       throw error;
     }
   }
@@ -350,7 +351,7 @@ export class DBConnectionManager {
       const parsed = JSON.parse(data) as DBConnectionsFile;
       this.connections = parsed.connections || [];
     } catch (error) {
-      console.error('[DBConnectionManager] 加载配置文件失败:', error);
+      logger.error(error, '[DBConnectionManager] 加载配置文件失败');
       this.connections = [];
     }
   }
