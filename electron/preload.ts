@@ -9,11 +9,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getExternalDBConnections: () => ipcRenderer.invoke('db:get-external-connections'),
   testExternalDBConnection: (connectionName: string) => ipcRenderer.invoke('db:test-external-connection', connectionName),
 
-  // ENT 同步 API
-  getEntSyncTables: () => ipcRenderer.invoke('ent:get-sync-tables'),
-  getEntList: () => ipcRenderer.invoke('ent:get-ent-list'),
-  entPreview: (sourceEnt: number) => ipcRenderer.invoke('ent:preview', sourceEnt),
-  entSyncAll: (sourceEnt: number, targetEnt: number) => ipcRenderer.invoke('ent:sync-all', sourceEnt, targetEnt),
+  // Azzi001 同步 API
+  getAzzi001SyncTables: () => ipcRenderer.invoke('azzi001:get-sync-tables'),
+  getAzzi001List: () => ipcRenderer.invoke('azzi001:get-ent-list'),
+  azzi001Preview: (sourceEnt: number) => ipcRenderer.invoke('azzi001:preview', sourceEnt),
+  azzi001SyncAll: (sourceEnt: number, targetEnt: number) => ipcRenderer.invoke('azzi001:sync-all', sourceEnt, targetEnt),
 
   // T100 全局变量 API
   getT100Configs: () => ipcRenderer.invoke('t100:get-configs'),

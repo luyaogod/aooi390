@@ -1,13 +1,13 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppLayout from '../layout/AppLayout'
-import EntSyncPage from '../pages/EntSyncPage'
+import SyncAzzi001Page from '../pages/SyncAzzi001Page'
 import SettingsPage from '../pages/SettingsPage'
 
 function PageCache() {
   const location = useLocation()
 
   const pages = [
-    { path: '/ent-sync', element: <EntSyncPage /> },
+    { path: '/sync-azzi001', element: <SyncAzzi001Page /> },
     { path: '/settings', element: <SettingsPage /> },
   ]
 
@@ -30,7 +30,7 @@ export default function AppRouter() {
     <HashRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<Navigate to="/ent-sync" replace />} />
+          <Route path="/" element={<Navigate to="/sync-azzi001" replace />} />
           <Route path="/*" element={<PageCache />} />
         </Routes>
       </AppLayout>

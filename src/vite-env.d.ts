@@ -29,18 +29,18 @@ interface ExternalDBTestResult {
   name?: string
 }
 
-interface EntSyncTableConfig {
+interface Azzi001SyncTableConfig {
   tableName: string
   entField: string
 }
 
-interface EntSyncPreview {
+interface Azzi001SyncPreview {
   tableName: string
   entField: string
   sourceCount: number
 }
 
-interface EntSyncStepResult {
+interface Azzi001SyncStepResult {
   tableName: string
   success: boolean
   sourceCount: number
@@ -51,9 +51,9 @@ interface EntSyncStepResult {
   error?: string
 }
 
-interface EntSyncAllResult {
+interface Azzi001SyncAllResult {
   success: boolean
-  results: EntSyncStepResult[]
+  results: Azzi001SyncStepResult[]
   message: string
 }
 
@@ -87,10 +87,10 @@ interface ElectronAPI {
   getSQLiteStatus: () => Promise<SQLiteStatus>
   getExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
   testExternalDBConnection: (connectionName: string) => Promise<ExternalDBTestResult>
-  getEntSyncTables: () => Promise<{ success: boolean; tables: EntSyncTableConfig[]; error?: string }>
-  getEntList: () => Promise<{ success: boolean; entList: number[]; error?: string }>
-  entPreview: (sourceEnt: number) => Promise<{ success: boolean; preview: EntSyncPreview[]; error?: string }>
-  entSyncAll: (sourceEnt: number, targetEnt: number) => Promise<EntSyncAllResult>
+  getAzzi001SyncTables: () => Promise<{ success: boolean; tables: Azzi001SyncTableConfig[]; error?: string }>
+  getAzzi001List: () => Promise<{ success: boolean; entList: number[]; error?: string }>
+  azzi001Preview: (sourceEnt: number) => Promise<{ success: boolean; preview: Azzi001SyncPreview[]; error?: string }>
+  azzi001SyncAll: (sourceEnt: number, targetEnt: number) => Promise<Azzi001SyncAllResult>
   getT100Configs: () => Promise<T100ConfigsResult>
   getT100ActiveConfig: () => Promise<T100ActiveConfigResult>
   setT100ActiveConfig: (name: string) => Promise<{ success: boolean }>

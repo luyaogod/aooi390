@@ -39,7 +39,7 @@ import {
   XCircle,
 } from 'lucide-react'
 
-function EntSyncPage() {
+function SyncAzzi001Page() {
   const [tables, setTables] = useState<Array<{ tableName: string; entField: string }>>([])
   const [tablesLoading, setTablesLoading] = useState(true)
 
@@ -61,7 +61,7 @@ function EntSyncPage() {
   const fetchEntList = async () => {
     setEntListLoading(true)
     try {
-      const result = await window.electronAPI.getEntList()
+      const result = await window.electronAPI.getAzzi001List()
       if (result.success) {
         setEntList(result.entList)
       }
@@ -75,12 +75,12 @@ function EntSyncPage() {
   const fetchTables = async () => {
     setTablesLoading(true)
     try {
-      const result = await window.electronAPI.getEntSyncTables()
+      const result = await window.electronAPI.getAzzi001SyncTables()
       if (result.success) {
         setTables(result.tables)
       }
     } catch (err) {
-      console.error('获取ENT同步表配置失败:', err)
+      console.error('获取Azzi001同步表配置失败:', err)
     } finally {
       setTablesLoading(false)
     }
@@ -95,12 +95,12 @@ function EntSyncPage() {
     setConfirmed(false)
     setSyncResult(null)
     try {
-      const result = await window.electronAPI.entPreview(src)
+      const result = await window.electronAPI.azzi001Preview(src)
       if (result.success) {
         setPreview(result.preview)
       }
     } catch (err) {
-      console.error('ENT预览失败:', err)
+      console.error('Azzi001预览失败:', err)
     } finally {
       setPreviewLoading(false)
     }
@@ -118,7 +118,7 @@ function EntSyncPage() {
     setSyncLoading(true)
     setSyncResult(null)
     try {
-      const result = await window.electronAPI.entSyncAll(src, tgt)
+      const result = await window.electronAPI.azzi001SyncAll(src, tgt)
       setSyncResult(result)
     } catch (err) {
       setSyncResult({
@@ -425,4 +425,4 @@ function EntSyncPage() {
   )
 }
 
-export default EntSyncPage
+export default SyncAzzi001Page

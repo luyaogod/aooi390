@@ -16,7 +16,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    path: '/ent-sync',
+    path: '/sync-azzi001',
     label: '同步流程图',
     icon: <GitBranch className="size-4" />,
   },

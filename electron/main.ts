@@ -5,7 +5,7 @@ import { appDB, externalDB } from './db/clients'
 import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
-import { entSyncService } from './core/ent-sync-service'
+import { syncAzzi001Service } from './core/sync-azzi001'
 import logger from './utils/logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -176,21 +176,21 @@ ipcMain.handle('db:test-external-connection', async (_event, connectionName: str
   }
 })
 
-// IPC: 获取ENT同步表配置
-ipcMain.handle('ent:get-sync-tables', async () => {
+// IPC: 获取Azzi001同步表配置
+ipcMain.handle('azzi001:get-sync-tables', async () => {
   try {
-    const tables = entSyncService.getSyncTables()
+    const tables = syncAzzi001Service.getSyncTables()
     return { success: true, tables }
   } catch (error) {
-    logger.error(error, '[Main] 获取ENT同步表配置失败')
+    logger.error(error, '[Main] 获取Azzi001同步表配置失败')
     return { success: false, error: String(error), tables: [] }
   }
 })
 
 // IPC: 获取ENT编号列表
-ipcMain.handle('ent:get-ent-list', async () => {
+ipcMain.handle('azzi001:get-ent-list', async () => {
   try {
-    const entList = await entSyncService.getEntList()
+    const entList = await syncAzzi001Service.getEntList()
     return { success: true, entList }
   } catch (error) {
     logger.error(error, '[Main] 获取ENT列表失败')
@@ -198,24 +198,24 @@ ipcMain.handle('ent:get-ent-list', async () => {
   }
 })
 
-// IPC: ENT同步预览（查询源ENT数据条数）
-ipcMain.handle('ent:preview', async (_event, sourceEnt: number) => {
+// IPC: Azzi001同步预览（查询源ENT数据条数）
+ipcMain.handle('azzi001:preview', async (_event, sourceEnt: number) => {
   try {
-    const preview = await entSyncService.preview(sourceEnt)
+    const preview = await syncAzzi001Service.preview(sourceEnt)
     return { success: true, preview }
   } catch (error) {
-    logger.error(error, '[Main] ENT同步预览失败')
+    logger.error(error, '[Main] Azzi001同步预览失败')
     return { success: false, error: String(error), preview: [] }
   }
 })
 
-// IPC: 执行ENT同步
-ipcMain.handle('ent:sync-all', async (_event, sourceEnt: number, targetEnt: number) => {
+// IPC: 执行Azzi001同步
+ipcMain.handle('azzi001:sync-all', async (_event, sourceEnt: number, targetEnt: number) => {
   try {
-    const result = await entSyncService.syncAll(sourceEnt, targetEnt)
+    const result = await syncAzzi001Service.syncAll(sourceEnt, targetEnt)
     return result
   } catch (error) {
-    logger.error(error, '[Main] ENT同步失败')
+    logger.error(error, '[Main] Azzi001同步失败')
     return {
       success: false,
       results: [],
