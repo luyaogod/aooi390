@@ -29,20 +29,6 @@ interface ExternalDBTestResult {
   name?: string
 }
 
-interface SyncResult {
-  tableName: string
-  success: boolean
-  sourceCount: number
-  insertedCount: number
-  error?: string
-}
-
-interface SyncAllResult {
-  success: boolean
-  results: SyncResult[]
-  message: string
-}
-
 interface EntSyncTableConfig {
   tableName: string
   entField: string
@@ -101,8 +87,6 @@ interface ElectronAPI {
   getSQLiteStatus: () => Promise<SQLiteStatus>
   getExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
   testExternalDBConnection: (connectionName: string) => Promise<ExternalDBTestResult>
-  getSyncTables: () => Promise<{ success: boolean; tables: string[]; error?: string }>
-  syncAllTables: () => Promise<SyncAllResult>
   getEntSyncTables: () => Promise<{ success: boolean; tables: EntSyncTableConfig[]; error?: string }>
   getEntList: () => Promise<{ success: boolean; entList: number[]; error?: string }>
   entPreview: (sourceEnt: number) => Promise<{ success: boolean; preview: EntSyncPreview[]; error?: string }>

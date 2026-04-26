@@ -1,6 +1,5 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppLayout from '../layout/AppLayout'
-import SyncDataPage from '../pages/SyncDataPage'
 import EntSyncPage from '../pages/EntSyncPage'
 import SettingsPage from '../pages/SettingsPage'
 
@@ -8,7 +7,6 @@ function PageCache() {
   const location = useLocation()
 
   const pages = [
-    { path: '/sync-data', element: <SyncDataPage /> },
     { path: '/ent-sync', element: <EntSyncPage /> },
     { path: '/settings', element: <SettingsPage /> },
   ]
@@ -32,7 +30,7 @@ export default function AppRouter() {
     <HashRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<Navigate to="/sync-data" replace />} />
+          <Route path="/" element={<Navigate to="/ent-sync" replace />} />
           <Route path="/*" element={<PageCache />} />
         </Routes>
       </AppLayout>

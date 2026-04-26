@@ -5,7 +5,6 @@ import { appDB, externalDB } from './db/clients'
 import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
-import { dbSyncService } from './core/sync-service'
 import { entSyncService } from './core/ent-sync-service'
 import logger from './utils/logger'
 
@@ -172,32 +171,6 @@ ipcMain.handle('db:test-external-connection', async (_event, connectionName: str
     return {
       success: false,
       connected: false,
-      message: error instanceof Error ? error.message : String(error),
-    }
-  }
-})
-
-// IPC: 获取同步表列表
-ipcMain.handle('db:get-sync-tables', async () => {
-  try {
-    const tables = await dbSyncService.getSyncTables()
-    return { success: true, tables }
-  } catch (error) {
-    logger.error(error, '[Main] 获取同步表列表失败')
-    return { success: false, error: String(error), tables: [] }
-  }
-})
-
-// IPC: 同步所有配置的表
-ipcMain.handle('db:sync-all-tables', async () => {
-  try {
-    const result = await dbSyncService.syncAll()
-    return result
-  } catch (error) {
-    logger.error(error, '[Main] 同步失败')
-    return {
-      success: false,
-      results: [],
       message: error instanceof Error ? error.message : String(error),
     }
   }

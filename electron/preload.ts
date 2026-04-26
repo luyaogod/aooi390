@@ -9,10 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getExternalDBConnections: () => ipcRenderer.invoke('db:get-external-connections'),
   testExternalDBConnection: (connectionName: string) => ipcRenderer.invoke('db:test-external-connection', connectionName),
 
-  // 数据同步 API
-  getSyncTables: () => ipcRenderer.invoke('db:get-sync-tables'),
-  syncAllTables: () => ipcRenderer.invoke('db:sync-all-tables'),
-
   // ENT 同步 API
   getEntSyncTables: () => ipcRenderer.invoke('ent:get-sync-tables'),
   getEntList: () => ipcRenderer.invoke('ent:get-ent-list'),
