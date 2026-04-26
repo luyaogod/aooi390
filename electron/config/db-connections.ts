@@ -45,14 +45,6 @@ export interface UpdateConnectionRequest {
   description?: string;
 }
 
-/**
- * 连接配置文件结构
- */
-interface DBConnectionsFile {
-  /** 连接列表 */
-  connections: DBConnection[];
-}
-
 // ==================== DBConnectionManager ====================
 
 /**
@@ -98,9 +90,7 @@ export class DBConnectionManager {
 
       // 如果配置文件不存在，创建默认配置
       if (!fs.existsSync(this.configFilePath)) {
-        await this.saveToFile({
-          connections: [],
-        });
+        await this.saveToFile([]);
       }
 
       // 加载配置
@@ -289,9 +279,7 @@ export class DBConnectionManager {
    */
   public exportToJSON(): string {
     this.ensureInitialized();
-    return JSON5.stringify({
-      connections: this.connections,
-    }, null, 2);
+    return JSON5.stringify(this.connections, null, 2);
   }
 
   /**
@@ -300,11 +288,11 @@ export class DBConnectionManager {
    */
   public async importFromJSON(jsonString: string): Promise<void> {
     try {
-      const data = JSON5.parse(jsonString) as DBConnectionsFile;
-      if (!data.connections || !Array.isArray(data.connections)) {
-        throw new Error('无效的连接配置文件格式');
+      const data = JSON5.parse(jsonString);
+      if (!Array.isArray(data)) {
+        throw new Error('无效的连接配置文件格式，应为数组');
       }
-      this.connections = data.connections;
+      this.connections = data as DBConnection[];
       await this.persist();
       logger.info('[DBConnectionManager] 导入配置成功，共 %d 个连接', this.connections.length);
     } catch (error) {
@@ -330,8 +318,8 @@ export class DBConnectionManager {
   private async loadFromFile(): Promise<void> {
     try {
       const data = await fs.promises.readFile(this.configFilePath, 'utf-8');
-      const parsed = JSON5.parse(data) as DBConnectionsFile;
-      this.connections = parsed.connections || [];
+      const parsed = JSON5.parse(data) as DBConnection[];
+      this.connections = Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       logger.error(error, '[DBConnectionManager] 加载配置文件失败');
       this.connections = [];
@@ -342,16 +330,13 @@ export class DBConnectionManager {
    * 保存配置到文件
    */
   private async persist(): Promise<void> {
-    const data: DBConnectionsFile = {
-      connections: this.connections,
-    };
-    await this.saveToFile(data);
+    await this.saveToFile(this.connections);
   }
 
   /**
    * 保存数据到文件
    */
-  private async saveToFile(data: DBConnectionsFile): Promise<void> {
+  private async saveToFile(data: DBConnection[]): Promise<void> {
     await fs.promises.writeFile(
       this.configFilePath,
       JSON5.stringify(data, null, 2),

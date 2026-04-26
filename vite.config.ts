@@ -10,6 +10,11 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    watch: {
+      ignored: ['**/electron/app-data/**'],
+    },
+  },
   plugins: [
     react(),
     electron({

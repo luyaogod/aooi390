@@ -1,0 +1,28 @@
+[
+  {
+    name: '恒烁半导体-8888-ZB01-tiptop',
+    globals: {
+      g_user: 'tiptop',
+      g_dept: 'ZB01',
+      g_enterprise: '8888',
+      g_site: 'ZB01',
+      g_lang: 'zh_CN',
+      g_dlang: 'zh_CN',
+    },
+    description: '恒烁测试区区',
+    isDefault: false,
+  },
+  {
+    name: '恒烁半导体-333-HFHS-tiptop1',
+    globals: {
+      g_user: 'tiptop',
+      g_dept: 'HFHS',
+      g_enterprise: '333',
+      g_site: 'HFHS',
+      g_lang: 'zh_CN',
+      g_dlang: 'zh_CN',
+    },
+    description: '恒烁测试区',
+    isDefault: true,
+  },
+]

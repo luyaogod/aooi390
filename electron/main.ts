@@ -4,6 +4,7 @@ import path from 'node:path'
 import { appDB, externalDB } from './db/clients'
 import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
+import { t100GlobalManager } from './config/t100-global'
 import { dbSyncService } from './core/sync-service'
 import { entSyncService } from './core/ent-sync-service'
 import logger from './utils/logger'
@@ -247,6 +248,66 @@ ipcMain.handle('ent:sync-all', async (_event, sourceEnt: number, targetEnt: numb
       results: [],
       message: error instanceof Error ? error.message : String(error),
     }
+  }
+})
+
+// IPC: 获取 T100 全局变量配置列表
+ipcMain.handle('t100:get-configs', async () => {
+  try {
+    await t100GlobalManager.initialize()
+    const configs = t100GlobalManager.getAllConfigs()
+    return {
+      success: true,
+      configs: configs.map(c => ({
+        name: c.name,
+        globals: c.globals,
+        isDefault: c.isDefault,
+        description: c.description,
+      })),
+    }
+  } catch (error) {
+    logger.error(error, '[Main] 获取T100全局配置失败')
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      configs: [],
+    }
+  }
+})
+
+// IPC: 获取当前激活的 T100 全局变量配置
+ipcMain.handle('t100:get-active-config', async () => {
+  try {
+    await t100GlobalManager.initialize()
+    const config = t100GlobalManager.getActiveConfig()
+    return {
+      success: true,
+      config: config ? {
+        name: config.name,
+        globals: config.globals,
+        isDefault: config.isDefault,
+        description: config.description,
+      } : null,
+    }
+  } catch (error) {
+    logger.error(error, '[Main] 获取当前T100配置失败')
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      config: null,
+    }
+  }
+})
+
+// IPC: 切换 T100 全局变量配置
+ipcMain.handle('t100:set-active-config', async (_event, name: string) => {
+  try {
+    await t100GlobalManager.initialize()
+    const result = await t100GlobalManager.setActiveConfig(name)
+    return { success: result }
+  } catch (error) {
+    logger.error(error, '[Main] 切换T100配置失败')
+    return { success: false }
   }
 })
 

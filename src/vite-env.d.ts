@@ -71,6 +71,32 @@ interface EntSyncAllResult {
   message: string
 }
 
+interface T100GlobalItem {
+  name: string
+  globals: {
+    g_user: string
+    g_dept: string
+    g_enterprise: string
+    g_site: string
+    g_lang: string
+    g_dlang: string
+  }
+  isDefault?: boolean
+  description?: string
+}
+
+interface T100ConfigsResult {
+  success: boolean
+  configs: T100GlobalItem[]
+  error?: string
+}
+
+interface T100ActiveConfigResult {
+  success: boolean
+  config: T100GlobalItem | null
+  error?: string
+}
+
 interface ElectronAPI {
   getSQLiteStatus: () => Promise<SQLiteStatus>
   getExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
@@ -81,6 +107,9 @@ interface ElectronAPI {
   getEntList: () => Promise<{ success: boolean; entList: number[]; error?: string }>
   entPreview: (sourceEnt: number) => Promise<{ success: boolean; preview: EntSyncPreview[]; error?: string }>
   entSyncAll: (sourceEnt: number, targetEnt: number) => Promise<EntSyncAllResult>
+  getT100Configs: () => Promise<T100ConfigsResult>
+  getT100ActiveConfig: () => Promise<T100ActiveConfigResult>
+  setT100ActiveConfig: (name: string) => Promise<{ success: boolean }>
   on: (channel: string, listener: (...args: unknown[]) => void) => void
   off: (channel: string, listener: (...args: unknown[]) => void) => void
 }

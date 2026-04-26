@@ -1,7 +1,6 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppLayout from '../layout/AppLayout'
-import AppDBPage from '../pages/AppDBPage'
-import ExternalDBPage from '../pages/ExternalDBPage'
+import SyncDataPage from '../pages/SyncDataPage'
 import EntSyncPage from '../pages/EntSyncPage'
 import SettingsPage from '../pages/SettingsPage'
 
@@ -9,8 +8,7 @@ function PageCache() {
   const location = useLocation()
 
   const pages = [
-    { path: '/app-db', element: <AppDBPage /> },
-    { path: '/external-db', element: <ExternalDBPage /> },
+    { path: '/sync-data', element: <SyncDataPage /> },
     { path: '/ent-sync', element: <EntSyncPage /> },
     { path: '/settings', element: <SettingsPage /> },
   ]
@@ -34,7 +32,7 @@ export default function AppRouter() {
     <HashRouter>
       <AppLayout>
         <Routes>
-          <Route path="/" element={<Navigate to="/app-db" replace />} />
+          <Route path="/" element={<Navigate to="/sync-data" replace />} />
           <Route path="/*" element={<PageCache />} />
         </Routes>
       </AppLayout>

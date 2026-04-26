@@ -12,14 +12,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-} from '@/components/ui/select'
-import {
   Table,
   TableHeader,
   TableBody,
@@ -30,28 +22,12 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import {
-  Plug,
   Download,
   Loader2,
   AlertCircle,
   CheckCircle2,
   XCircle,
 } from 'lucide-react'
-
-interface ExternalDBConnection {
-  name: string
-  type: 'kingbase' | 'oracle'
-  isDefault?: boolean
-  description?: string
-}
-
-interface ExternalDBTestResult {
-  success: boolean
-  connected: boolean
-  message: string
-  dbType?: string
-  name?: string
-}
 
 interface SyncResult {
   tableName: string
@@ -67,55 +43,11 @@ interface SyncAllResult {
   message: string
 }
 
-function ExternalDBPage() {
-  const [connections, setConnections] = useState<ExternalDBConnection[]>([])
-  const [selectedConnectionName, setSelectedConnectionName] = useState<string>('')
-  const [externalLoading, setExternalLoading] = useState(false)
-  const [externalResult, setExternalResult] = useState<ExternalDBTestResult | null>(null)
-  const [connectionsLoading, setConnectionsLoading] = useState(true)
-
+function SyncDataPage() {
   const [syncTables, setSyncTables] = useState<string[]>([])
   const [syncLoading, setSyncLoading] = useState(false)
   const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null)
   const [syncTablesLoading, setSyncTablesLoading] = useState(true)
-
-  const fetchConnections = async () => {
-    setConnectionsLoading(true)
-    try {
-      const result = await window.electronAPI.getExternalDBConnections()
-      if (result.success) {
-        setConnections(result.connections)
-        const defaultConn = result.connections.find(c => c.isDefault)
-        if (defaultConn) {
-          setSelectedConnectionName(defaultConn.name)
-        } else if (result.connections.length > 0) {
-          setSelectedConnectionName(result.connections[0].name)
-        }
-      }
-    } catch (err) {
-      console.error('获取连接配置失败:', err)
-    } finally {
-      setConnectionsLoading(false)
-    }
-  }
-
-  const testExternalConnection = async () => {
-    if (!selectedConnection) return
-    setExternalLoading(true)
-    setExternalResult(null)
-    try {
-      const result = await window.electronAPI.testExternalDBConnection(selectedConnectionName)
-      setExternalResult(result)
-    } catch (err) {
-      setExternalResult({
-        success: false,
-        connected: false,
-        message: err instanceof Error ? err.message : String(err),
-      })
-    } finally {
-      setExternalLoading(false)
-    }
-  }
 
   const fetchSyncTables = async () => {
     setSyncTablesLoading(true)
@@ -149,118 +81,11 @@ function ExternalDBPage() {
   }
 
   useEffect(() => {
-    fetchConnections()
     fetchSyncTables()
   }, [])
 
-  const selectedConnection = connections.find(c => c.name === selectedConnectionName)
-
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
-      {/* 外部数据库卡片 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>外部数据库</CardTitle>
-          <CardDescription>连接并测试外部数据库（Kingbase / Oracle）</CardDescription>
-          {externalResult && (
-            <CardAction>
-              <Badge
-                className={externalResult.connected
-                  ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
-                  : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
-                }
-              >
-                {externalResult.connected ? '已连接' : '未连接'}
-              </Badge>
-            </CardAction>
-          )}
-        </CardHeader>
-
-        <CardContent className="flex flex-col gap-4">
-          {connectionsLoading ? (
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-4 w-1/3" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
-          ) : connections.length === 0 ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Plug className="size-4" />
-              暂无外部数据库连接配置
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <span className="text-muted-foreground">选择连接</span>
-                <Select
-                  value={selectedConnectionName}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setSelectedConnectionName(value)
-                      setExternalResult(null)
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {connections.map((conn) => (
-                        <SelectItem key={conn.name} value={conn.name}>
-                          {conn.name}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-
-                {selectedConnection && (
-                  <>
-                    <span className="text-muted-foreground">数据库类型</span>
-                    <Badge variant="secondary">
-                      {selectedConnection.type === 'kingbase' ? 'Kingbase' : 'Oracle'}
-                    </Badge>
-                    {selectedConnection.description && (
-                      <>
-                        <span className="text-muted-foreground">描述</span>
-                        <span>{selectedConnection.description}</span>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {externalResult && (
-                <Alert
-                  variant={externalResult.connected ? 'default' : 'destructive'}
-                >
-                  {externalResult.connected ? (
-                    <CheckCircle2 className="size-4" />
-                  ) : (
-                    <XCircle className="size-4" />
-                  )}
-                  <AlertTitle>测试结果</AlertTitle>
-                  <AlertDescription>{externalResult.message}</AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
-        </CardContent>
-
-        <CardFooter>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={testExternalConnection}
-            disabled={externalLoading || connections.length === 0}
-            className="gap-1.5"
-          >
-            <Plug className="size-3.5" />
-            {externalLoading ? '测试中...' : '测试连接'}
-          </Button>
-        </CardFooter>
-      </Card>
-
       {/* 数据拉取卡片 */}
       <Card>
         <CardHeader>
@@ -380,4 +205,4 @@ function ExternalDBPage() {
   )
 }
 
-export default ExternalDBPage
+export default SyncDataPage

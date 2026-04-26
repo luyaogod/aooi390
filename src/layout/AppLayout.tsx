@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import {
-  Database,
-  Server,
+  Download,
   GitBranch,
   Settings,
 } from 'lucide-react'
@@ -18,14 +17,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    path: '/app-db',
-    label: 'APP数据库',
-    icon: <Database className="size-4" />,
-  },
-  {
-    path: '/external-db',
-    label: '外部数据库',
-    icon: <Server className="size-4" />,
+    path: '/sync-data',
+    label: '拉取远程数据',
+    icon: <Download className="size-4" />,
   },
   {
     path: '/ent-sync',
