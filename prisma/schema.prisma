@@ -7,262 +7,434 @@ datasource db {
   url      = "file:D:/我的项目/aooi399/electron/app-data/database/app.db"
 }
 
-/// 系统分类码主档 (gzcb_t)
-model GzcbT {
-  gzcb001   Int     // 系统分类码 
-  gzcb002   String // 系统分类码值
-  gzcb003   String? // 系统应用字段一
-  gzcb004   String? // 系统应用字段二
-  gzcb005   String? // 系统应用字段三
-  gzcb006   String? // 系统应用字段四
-  gzcb007   String? // 系统应用字段五
-  gzcb008   String? // 系统应用字段六
-  gzcb009   String? // 系统应用字段七
-  gzcb010   String? // 系统应用字段八
-  gzcb011   String? // 系统应用字段九
-  gzcb012   String? // 选项顺序
-  gzcb013   String? // 客制
-  gzcb014   String? // 备注
-  gzcb015   String? // 库存异动分类
-  gzcbud001 String? // 自定义字段_文本_001
-  gzcbud002 String? // 自定义字段_文本_002
-  gzcbud003 String? // 自定义字段_文本_003
-  gzcbud004 String? // 自定义字段_文本_004
-  gzcbud005 String? // 自定义字段_文本_005
-  gzcbud006 String? // 自定义字段_文本_006
-  gzcbud007 String? // 自定义字段_文本_007
-  gzcbud008 String? // 自定义字段_文本_008
-  gzcbud009 String? // 自定义字段_文本_009
-  gzcbud010 String? // 自定义字段_文本_010
-  gzcbud011 Float? // 自定义字段_数字_011
-  gzcbud012 Float? // 自定义字段_数字_012
-  gzcbud013 Float? // 自定义字段_数字_013
-  gzcbud014 Float? // 自定义字段_数字_014
-  gzcbud015 Float? // 自定义字段_数字_015
-  gzcbud016 Float? // 自定义字段_数字_016
-  gzcbud017 Float? // 自定义字段_数字_017
-  gzcbud018 Float? // 自定义字段_数字_018
-  gzcbud019 Float? // 自定义字段_数字_019
-  gzcbud020 Float? // 自定义字段_数字_020
-  gzcbud021 DateTime? // 自定义字段_日期时间_021
-  gzcbud022 DateTime? // 自定义字段_日期时间_022
-  gzcbud023 DateTime? // 自定义字段_日期时间_023
-  gzcbud024 DateTime? // 自定义字段_日期时间_024
-  gzcbud025 DateTime? // 自定义字段_日期时间_025
-  gzcbud026 DateTime? // 自定义字段_日期时间_026
-  gzcbud027 DateTime? // 自定义字段_日期时间_027
-  gzcbud028 DateTime? // 自定义字段_日期时间_028
-  gzcbud029 DateTime? // 自定义字段_日期时间_029
-  gzcbud030 DateTime? // 自定义字段_日期时间_030
+model Oobx {
+  oobxent    Int       // 企业编号
+  oobx001    String    // 单据别
+  oobx002    String?   // 模组别
+  oobx003    String?   // 单据性质
+  oobx004    String?   // 对应作业编号
+  oobx005    String?   // 自动编码否
+  oobx006    String?   // 期别码
+  oobx007    Int?      // 所剩流水号长度
+  oobx008    String?   // 编码结果
+  oobx009    String?   // 于aoor700揭露
+  oobxownid  String?   // 资料所有者
+  oobxowndp  String?   // 资料所有部门
+  oobxcrtid  String?   // 资料录入者
+  oobxcrtdp  String?   // 资料录入部门
+  oobxcrtdt  DateTime? // 资料创建日
+  oobxmodid  String?   // 资料更改者
+  oobxmoddt  DateTime? // 最近更改日
+  oobxstus   String?   // 状态码
+  oobxud001  String?   // 自定义字段(文本)001
+  oobxud002  String?   // 自定义字段(文本)002
+  oobxud003  String?   // 自定义字段(文本)003
+  oobxud004  String?   // 自定义字段(文本)004
+  oobxud005  String?   // 自定义字段(文本)005
+  oobxud006  String?   // 自定义字段(文本)006
+  oobxud007  String?   // 自定义字段(文本)007
+  oobxud008  String?   // 自定义字段(文本)008
+  oobxud009  String?   // 自定义字段(文本)009
+  oobxud010  String?   // 自定义字段(文本)010
+  oobxud011  Float?    // 自定义字段(数字)011
+  oobxud012  Float?    // 自定义字段(数字)012
+  oobxud013  Float?    // 自定义字段(数字)013
+  oobxud014  Float?    // 自定义字段(数字)014
+  oobxud015  Float?    // 自定义字段(数字)015
+  oobxud016  Float?    // 自定义字段(数字)016
+  oobxud017  Float?    // 自定义字段(数字)017
+  oobxud018  Float?    // 自定义字段(数字)018
+  oobxud019  Float?    // 自定义字段(数字)019
+  oobxud020  Float?    // 自定义字段(数字)020
+  oobxud021  DateTime? // 自定义字段(日期时间)021
+  oobxud022  DateTime? // 自定义字段(日期时间)022
+  oobxud023  DateTime? // 自定义字段(日期时间)023
+  oobxud024  DateTime? // 自定义字段(日期时间)024
+  oobxud025  DateTime? // 自定义字段(日期时间)025
+  oobxud026  DateTime? // 自定义字段(日期时间)026
+  oobxud027  DateTime? // 自定义字段(日期时间)027
+  oobxud028  DateTime? // 自定义字段(日期时间)028
+  oobxud029  DateTime? // 自定义字段(日期时间)029
+  oobxud030  DateTime? // 自定义字段(日期时间)030
 
-  @@id([gzcb001, gzcb002])
-  @@map("gzcb_t")
+  @@id([oobxent, oobx001])
+  @@map("oobx_t")
 }
 
-/// 系统分类码多语言档 (gzcbl_t)
-model GzcblT {
-  gzcbl001 Int // 系统分类码
-  gzcbl002 String // 系统分类值
-  gzcbl003 String // 语言别
-  gzcbl004 String? // 说明
-  gzcbl005 String? // 注记码
-  gzcbl006 String? // 应用说明
-  gzcbl007 String? // 客制
+model Oobxl {
+  oobxlent  Int     // 企业编号
+  oobxl001  String  // 单据别
+  oobxl002  String  // 语言别
+  oobxl003  String? // 说明
+  oobxl004  String? // 助记码
 
-  @@id([gzcbl001, gzcbl002, gzcbl003])
-  @@map("gzcbl_t")
+  @@id([oobxlent, oobxl001, oobxl002])
+  @@map("oobxl_t")
 }
 
-/// 系统参数档 (gzsy_t)
-model GzsyT {
-  gzsy001   String // 表格编号
-  gzsy002   String // 参数编号
-  gzsy003   String? // 模组别
-  gzsy004   String // 关联单据性质
-  gzsy005   String? // 已抛转
-  gzsyud001 String? // 自定义字段_文本_001
-  gzsyud002 String? // 自定义字段_文本_002
-  gzsyud003 String? // 自定义字段_文本_003
-  gzsyud004 String? // 自定义字段_文本_004
-  gzsyud005 String? // 自定义字段_文本_005
-  gzsyud006 String? // 自定义字段_文本_006
-  gzsyud007 String? // 自定义字段_文本_007
-  gzsyud008 String? // 自定义字段_文本_008
-  gzsyud009 String? // 自定义字段_文本_009
-  gzsyud010 String? // 自定义字段_文本_010
-  gzsyud011 Float? // 自定义字段_数字_011
-  gzsyud012 Float? // 自定义字段_数字_012
-  gzsyud013 Float? // 自定义字段_数字_013
-  gzsyud014 Float? // 自定义字段_数字_014
-  gzsyud015 Float? // 自定义字段_数字_015
-  gzsyud016 Float? // 自定义字段_数字_016
-  gzsyud017 Float? // 自定义字段_数字_017
-  gzsyud018 Float? // 自定义字段_数字_018
-  gzsyud019 Float? // 自定义字段_数字_019
-  gzsyud020 Float? // 自定义字段_数字_020
-  gzsyud021 DateTime? // 自定义字段_日期时间_021
-  gzsyud022 DateTime? // 自定义字段_日期时间_022
-  gzsyud023 DateTime? // 自定义字段_日期时间_023
-  gzsyud024 DateTime? // 自定义字段_日期时间_024
-  gzsyud025 DateTime? // 自定义字段_日期时间_025
-  gzsyud026 DateTime? // 自定义字段_日期时间_026
-  gzsyud027 DateTime? // 自定义字段_日期时间_027
-  gzsyud028 DateTime? // 自定义字段_日期时间_028
-  gzsyud029 DateTime? // 自定义字段_日期时间_029
-  gzsyud030 DateTime? // 自定义字段_日期时间_030
+model Ooac {
+  ooacent   Int       // 企业编号
+  ooac001   String    // 参照表号
+  ooac002   String    // 单据别
+  ooac003   String    // 参数编号
+  ooac004   String?   // 参数值
+  ooacownid String?   // 资料所有者
+  ooacowndp String?   // 资料所有部门
+  ooaccrtid String?   // 资料录入者
+  ooaccrtdp String?   // 资料录入部门
+  ooaccrtdt DateTime? // 资料创建日
+  ooacmodid String?   // 资料更改者
+  ooacmoddt DateTime? // 最近更改日
+  ooacstus  String?   // 状态码
 
-  @@id([gzsy001, gzsy002, gzsy004])
-  @@map("gzsy_t")
+  @@id([ooacent, ooac001, ooac002, ooac003])
+  @@map("ooac_t")
 }
 
-/// 数据授权档 (gzsz_t)
-model GzszT {
-  gzszstus  String? // 状态码
-  gzsz001   String // 表格编号
-  gzsz002   String // 参数编号
-  gzsz003   String? // 录入限制数据型态
-  gzsz004   String? // 设置作业名称
-  gzsz005   Int? // 设置序号
-  gzsz006   String? // 分页编号
-  gzsz007   String? // 分项编号
-  gzsz008   String? // 默认值
-  gzsz009   String? // 值域范围
-  gzsz010   String? // 层级
-  gzsz011   String? // 领域_应用类型
-  gzsz012   String? // 类别
-  gzszownid String? // 资料所有者
-  gzszowndp String? // 资料所有部门
-  gzszcrtid String? // 资料录入者
-  gzszcrtdp String? // 资料录入部门
-  gzszcrtdt DateTime? // 资料创建日
-  gzszmodid String? // 资料更改者
-  gzszmoddt DateTime? // 最近更改日
-  gzsz013   String? // 校验
-  gzsz014   String? // 开窗
-  gzsz015   String? // 限定格式
-  gzsz016   Int? // 值域范围说明_SCC
-  gzsz017   String? // 取参数时发生异常的处理方法
-  gzsz018   String? // 允许更改的频度
-  gzsz019   String? // 允许参数即时抓取
+model Ooba {
+  oobastus  String?   // 状态码
+  oobaent   Int       // 企业编号
+  ooba001   String    // 参照表编号
+  ooba002   String    // 单据别编号
+  ooba008   String?   // 可用From
+  ooba009   String?   // 可用To
+  ooba010   String?   // MRP可用From
+  ooba011   String?   // MRP可用To
+  ooba012   String?   // 成本仓From
+  ooba013   String?   // 成本仓To
+  oobaownid String?   // 资料所有者
+  oobaowndp String?   // 资料所有部门
+  oobacrtid String?   // 资料录入者
+  oobacrtdp String?   // 资料录入部门
+  oobacrtdt DateTime? // 资料创建日
+  oobamodid String?   // 资料更改者
+  oobamoddt DateTime? // 最近更改日
+  ooba014   String?   // 产品分类-正/负向表列
+  ooba015   String?   // 理由码-正/负向表列
+  oobaud001 String?   // 自定义字段(文本)001
+  oobaud002 String?   // 自定义字段(文本)002
+  oobaud003 String?   // 自定义字段(文本)003
+  oobaud004 String?   // 自定义字段(文本)004
+  oobaud005 String?   // 自定义字段(文本)005
+  oobaud006 String?   // 自定义字段(文本)006
+  oobaud007 String?   // 自定义字段(文本)007
+  oobaud008 String?   // 自定义字段(文本)008
+  oobaud009 String?   // 自定义字段(文本)009
+  oobaud010 String?   // 自定义字段(文本)010
+  oobaud011 Float?    // 自定义字段(数字)011
+  oobaud012 Float?    // 自定义字段(数字)012
+  oobaud013 Float?    // 自定义字段(数字)013
+  oobaud014 Float?    // 自定义字段(数字)014
+  oobaud015 Float?    // 自定义字段(数字)015
+  oobaud016 Float?    // 自定义字段(数字)016
+  oobaud017 Float?    // 自定义字段(数字)017
+  oobaud018 Float?    // 自定义字段(数字)018
+  oobaud019 Float?    // 自定义字段(数字)019
+  oobaud020 Float?    // 自定义字段(数字)020
+  oobaud021 DateTime? // 自定义字段(日期时间)021
+  oobaud022 DateTime? // 自定义字段(日期时间)022
+  oobaud023 DateTime? // 自定义字段(日期时间)023
+  oobaud024 DateTime? // 自定义字段(日期时间)024
+  oobaud025 DateTime? // 自定义字段(日期时间)025
+  oobaud026 DateTime? // 自定义字段(日期时间)026
+  oobaud027 DateTime? // 自定义字段(日期时间)027
+  oobaud028 DateTime? // 自定义字段(日期时间)028
+  oobaud029 DateTime? // 自定义字段(日期时间)029
+  oobaud030 DateTime? // 自定义字段(日期时间)030
+  ooba016   String?   // 备注
+  ooba017   String?   // 控制组-正/负向表列
+  ooba018   String?   // 生命周期-正/负向表列
+  ooba019   String?   // 库存标签FROM-正/负向表列
+  ooba020   String?   // 库存标签TO-正/负向表列
 
-  @@id([gzsz001, gzsz002])
-  @@map("gzsz_t")
+  @@id([oobaent, ooba001, ooba002])
+  @@map("ooba_t")
 }
 
-/// 数据授权多语言档 (gzszl_t)
-model GzszlT {
-  gzszl001 String // 表格编号
-  gzszl002 String // 数据序号
-  gzszl003 String // 语言别
-  gzszl004 String? // 说明
-  gzszl005 String? // 使用说明
-  gzszl006 String? // 应用建议
-  gzszl007 String? // 个案应用说明
+model Oobb {
+  oobbent   Int       // 企业编号
+  oobb001   String    // 参照表号
+  oobb002   String    // 单据别
+  oobb003   Int       // 序号
+  oobb004   String?   // 字段编号
+  oobb005   String?   // 默认值
+  oobb006   String?   // 默认值说明
+  oobb007   String?   // 可更改
+  oobb008   String?   // 备注
+  oobbud001 String?   // 自定义字段(文本)001
+  oobbud002 String?   // 自定义字段(文本)002
+  oobbud003 String?   // 自定义字段(文本)003
+  oobbud004 String?   // 自定义字段(文本)004
+  oobbud005 String?   // 自定义字段(文本)005
+  oobbud006 String?   // 自定义字段(文本)006
+  oobbud007 String?   // 自定义字段(文本)007
+  oobbud008 String?   // 自定义字段(文本)008
+  oobbud009 String?   // 自定义字段(文本)009
+  oobbud010 String?   // 自定义字段(文本)010
+  oobbud011 Float?    // 自定义字段(数字)011
+  oobbud012 Float?    // 自定义字段(数字)012
+  oobbud013 Float?    // 自定义字段(数字)013
+  oobbud014 Float?    // 自定义字段(数字)014
+  oobbud015 Float?    // 自定义字段(数字)015
+  oobbud016 Float?    // 自定义字段(数字)016
+  oobbud017 Float?    // 自定义字段(数字)017
+  oobbud018 Float?    // 自定义字段(数字)018
+  oobbud019 Float?    // 自定义字段(数字)019
+  oobbud020 Float?    // 自定义字段(数字)020
+  oobbud021 DateTime? // 自定义字段(日期时间)021
+  oobbud022 DateTime? // 自定义字段(日期时间)022
+  oobbud023 DateTime? // 自定义字段(日期时间)023
+  oobbud024 DateTime? // 自定义字段(日期时间)024
+  oobbud025 DateTime? // 自定义字段(日期时间)025
+  oobbud026 DateTime? // 自定义字段(日期时间)026
+  oobbud027 DateTime? // 自定义字段(日期时间)027
+  oobbud028 DateTime? // 自定义字段(日期时间)028
+  oobbud029 DateTime? // 自定义字段(日期时间)029
+  oobbud030 DateTime? // 自定义字段(日期时间)030
 
-  @@id([gzszl001, gzszl002, gzszl003])
-  @@map("gzszl_t")
+  @@id([oobbent, oobb001, oobb002, oobb003])
+  @@map("oobb_t")
 }
 
-/// 程序授权档 (gzza_t)
-model GzzaT {
-  gzzastus  String? // 状态码
-  gzza001   String    @id // 程序编号
-  gzza002   String? // 程序类别
-  gzza003   String? // 归属模块
-  gzza004   String? // 系统运行指令
-  gzza005   String? // 单身显示笔数处理方法
-  gzza006   String? // 可于更改时调整主要键值_PK_数据
-  gzza007   Int? // 最大单身显示笔数
-  gzza008   String? // 引用主程序编号
-  gzza009   String? // 执行时生成SQL操作历程档
-  gzza010   String? // 将错误消息写入LOG
-  gzza011   String? // 客制
-  gzza012   String? // 处理闲置连接方式
-  gzza013   String? // 处理闲置连接关闭的作法
-  gzza014   Int? // 闲置时间_秒
-  gzza015   String? // 归属行业别
-  gzza016   String? // 程序可维护_特别开发属性
-  gzzaownid String? // 资料所有者
-  gzzaowndp String? // 资料所有部门
-  gzzacrtid String? // 资料录入者
-  gzzacrtdp String? // 资料录入部门
-  gzzacrtdt DateTime? // 资料创建日
-  gzzamodid String? // 资料更改者
-  gzzamoddt DateTime? // 最近更改日
-  gzza017   String? // 单据日期控管方式
-  gzza018   String? // 过账日期控管方式
-  gzza019   String? // Q类作业上阶串查作业编号
-  gzza020   String? // Q类作业上阶串查使用字段
-  gzza021   String? // 允许运行环境
-  gzza022   String? // 可不受闲置时间控管的营运据点
-  gzza023   String? // 与POI串接
-  gzza024   Int? // POI内存使用上限
+model Oobc {
+  oobcent   Int       // 企业编号
+  oobc001   String    // 参照表号
+  oobc002   String    // 单据别
+  oobc003   String    // 控制组编号
+  oobcud001 String?   // 自定义字段(文本)001
+  oobcud002 String?   // 自定义字段(文本)002
+  oobcud003 String?   // 自定义字段(文本)003
+  oobcud004 String?   // 自定义字段(文本)004
+  oobcud005 String?   // 自定义字段(文本)005
+  oobcud006 String?   // 自定义字段(文本)006
+  oobcud007 String?   // 自定义字段(文本)007
+  oobcud008 String?   // 自定义字段(文本)008
+  oobcud009 String?   // 自定义字段(文本)009
+  oobcud010 String?   // 自定义字段(文本)010
+  oobcud011 Float?    // 自定义字段(数字)011
+  oobcud012 Float?    // 自定义字段(数字)012
+  oobcud013 Float?    // 自定义字段(数字)013
+  oobcud014 Float?    // 自定义字段(数字)014
+  oobcud015 Float?    // 自定义字段(数字)015
+  oobcud016 Float?    // 自定义字段(数字)016
+  oobcud017 Float?    // 自定义字段(数字)017
+  oobcud018 Float?    // 自定义字段(数字)018
+  oobcud019 Float?    // 自定义字段(数字)019
+  oobcud020 Float?    // 自定义字段(数字)020
+  oobcud021 DateTime? // 自定义字段(日期时间)021
+  oobcud022 DateTime? // 自定义字段(日期时间)022
+  oobcud023 DateTime? // 自定义字段(日期时间)023
+  oobcud024 DateTime? // 自定义字段(日期时间)024
+  oobcud025 DateTime? // 自定义字段(日期时间)025
+  oobcud026 DateTime? // 自定义字段(日期时间)026
+  oobcud027 DateTime? // 自定义字段(日期时间)027
+  oobcud028 DateTime? // 自定义字段(日期时间)028
+  oobcud029 DateTime? // 自定义字段(日期时间)029
+  oobcud030 DateTime? // 自定义字段(日期时间)030
+  oobc004   String?   // 控制组类型
 
-  @@map("gzza_t")
+  @@id([oobcent, oobc001, oobc002, oobc003])
+  @@map("oobc_t")
 }
 
-/// 程序授权多语言档 (gzzal_t)
-model GzzalT {
-  gzzal001 String // 程序编号
-  gzzal002 String // 语言别
-  gzzal003 String? // 程序名称
-  gzzal004 String? // 助记码
-  gzzal005 String? // 程序简称
-  gzzal006 String? // 客制
+model Oobd {
+  oobdent   Int       // 企业编号
+  oobd001   String    // 参照表号
+  oobd002   String    // 单据别
+  oobd003   String    // 生命周期类型
+  oobd004   String    // 生命周期编号
+  oobdud001 String?   // 自定义栏位(文字)001
+  oobdud002 String?   // 自定义栏位(文字)002
+  oobdud003 String?   // 自定义栏位(文字)003
+  oobdud004 String?   // 自定义栏位(文字)004
+  oobdud005 String?   // 自定义栏位(文字)005
+  oobdud006 String?   // 自定义栏位(文字)006
+  oobdud007 String?   // 自定义栏位(文字)007
+  oobdud008 String?   // 自定义栏位(文字)008
+  oobdud009 String?   // 自定义栏位(文字)009
+  oobdud010 String?   // 自定义栏位(文字)010
+  oobdud011 Float?    // 自定义栏位(数字)011
+  oobdud012 Float?    // 自定义栏位(数字)012
+  oobdud013 Float?    // 自定义栏位(数字)013
+  oobdud014 Float?    // 自定义栏位(数字)014
+  oobdud015 Float?    // 自定义栏位(数字)015
+  oobdud016 Float?    // 自定义栏位(数字)016
+  oobdud017 Float?    // 自定义栏位(数字)017
+  oobdud018 Float?    // 自定义栏位(数字)018
+  oobdud019 Float?    // 自定义栏位(数字)019
+  oobdud020 Float?    // 自定义栏位(数字)020
+  oobdud021 DateTime? // 自定义栏位(日期时间)021
+  oobdud022 DateTime? // 自定义栏位(日期时间)022
+  oobdud023 DateTime? // 自定义栏位(日期时间)023
+  oobdud024 DateTime? // 自定义栏位(日期时间)024
+  oobdud025 DateTime? // 自定义栏位(日期时间)025
+  oobdud026 DateTime? // 自定义栏位(日期时间)026
+  oobdud027 DateTime? // 自定义栏位(日期时间)027
+  oobdud028 DateTime? // 自定义栏位(日期时间)028
+  oobdud029 DateTime? // 自定义栏位(日期时间)029
+  oobdud030 DateTime? // 自定义栏位(日期时间)030
 
-  @@id([gzzal001, gzzal002])
-  @@map("gzzal_t")
+  @@id([oobdent, oobd001, oobd002, oobd003, oobd004])
+  @@map("oobd_t")
 }
 
-/// 模块资料档 (gzzj_t)
-model GzzjT {
-  gzzj001   String    @id // 实际模块编号
-  gzzj002   String? // 功能类别
-  gzzj003   String? // 归属模块编号
-  gzzjownid String? // 资料所有者
-  gzzjowndp String? // 资料所有部门
-  gzzjcrtid String? // 资料录入者
-  gzzjcrtdp String? // 资料录入部门
-  gzzjcrtdt DateTime? // 资料创建日
-  gzzjmodid String? // 资料更改者
-  gzzjmoddt DateTime? // 最近更改日
-  gzzjstus  String? // 状态码
+model Oobh {
+  oobhent   Int       // 企业编号
+  oobh001   String    // 参照表号
+  oobh002   String    // 单据别
+  oobh003   String    // 产品分类
+  oobhud001 String?   // 自定义栏位(文字)001
+  oobhud002 String?   // 自定义栏位(文字)002
+  oobhud003 String?   // 自定义栏位(文字)003
+  oobhud004 String?   // 自定义栏位(文字)004
+  oobhud005 String?   // 自定义栏位(文字)005
+  oobhud006 String?   // 自定义栏位(文字)006
+  oobhud007 String?   // 自定义栏位(文字)007
+  oobhud008 String?   // 自定义栏位(文字)008
+  oobhud009 String?   // 自定义栏位(文字)009
+  oobhud010 String?   // 自定义栏位(文字)010
+  oobhud011 Float?    // 自定义栏位(数字)011
+  oobhud012 Float?    // 自定义栏位(数字)012
+  oobhud013 Float?    // 自定义栏位(数字)013
+  oobhud014 Float?    // 自定义栏位(数字)014
+  oobhud015 Float?    // 自定义栏位(数字)015
+  oobhud016 Float?    // 自定义栏位(数字)016
+  oobhud017 Float?    // 自定义栏位(数字)017
+  oobhud018 Float?    // 自定义栏位(数字)018
+  oobhud019 Float?    // 自定义栏位(数字)019
+  oobhud020 Float?    // 自定义栏位(数字)020
+  oobhud021 DateTime? // 自定义栏位(日期时间)021
+  oobhud022 DateTime? // 自定义栏位(日期时间)022
+  oobhud023 DateTime? // 自定义栏位(日期时间)023
+  oobhud024 DateTime? // 自定义栏位(日期时间)024
+  oobhud025 DateTime? // 自定义栏位(日期时间)025
+  oobhud026 DateTime? // 自定义栏位(日期时间)026
+  oobhud027 DateTime? // 自定义栏位(日期时间)027
+  oobhud028 DateTime? // 自定义栏位(日期时间)028
+  oobhud029 DateTime? // 自定义栏位(日期时间)029
+  oobhud030 DateTime? // 自定义栏位(日期时间)030
 
-  @@map("gzzj_t")
+  @@id([oobhent, oobh001, oobh002, oobh003])
+  @@map("oobh_t")
 }
 
-/// 模块多语言档 (gzzol_t)
-model GzzolT {
-  gzzol001 String // 模块编号
-  gzzol002 String // 语言别
-  gzzol003 String? // 模组名称
-  gzzol004 String? // 助记码
+model Oobi {
+  oobient   Int       // 企业编号
+  oobi001   String    // 参照表号
+  oobi002   String    // 单据别
+  oobi003   String    // 单身理由码
+  oobiud001 String?   // 自定义栏位(文字)001
+  oobiud002 String?   // 自定义栏位(文字)002
+  oobiud003 String?   // 自定义栏位(文字)003
+  oobiud004 String?   // 自定义栏位(文字)004
+  oobiud005 String?   // 自定义栏位(文字)005
+  oobiud006 String?   // 自定义栏位(文字)006
+  oobiud007 String?   // 自定义栏位(文字)007
+  oobiud008 String?   // 自定义栏位(文字)008
+  oobiud009 String?   // 自定义栏位(文字)009
+  oobiud010 String?   // 自定义栏位(文字)010
+  oobiud011 Float?    // 自定义栏位(数字)011
+  oobiud012 Float?    // 自定义栏位(数字)012
+  oobiud013 Float?    // 自定义栏位(数字)013
+  oobiud014 Float?    // 自定义栏位(数字)014
+  oobiud015 Float?    // 自定义栏位(数字)015
+  oobiud016 Float?    // 自定义栏位(数字)016
+  oobiud017 Float?    // 自定义栏位(数字)017
+  oobiud018 Float?    // 自定义栏位(数字)018
+  oobiud019 Float?    // 自定义栏位(数字)019
+  oobiud020 Float?    // 自定义栏位(数字)020
+  oobiud021 DateTime? // 自定义栏位(日期时间)021
+  oobiud022 DateTime? // 自定义栏位(日期时间)022
+  oobiud023 DateTime? // 自定义栏位(日期时间)023
+  oobiud024 DateTime? // 自定义栏位(日期时间)024
+  oobiud025 DateTime? // 自定义栏位(日期时间)025
+  oobiud026 DateTime? // 自定义栏位(日期时间)026
+  oobiud027 DateTime? // 自定义栏位(日期时间)027
+  oobiud028 DateTime? // 自定义栏位(日期时间)028
+  oobiud029 DateTime? // 自定义栏位(日期时间)029
+  oobiud030 DateTime? // 自定义栏位(日期时间)030
 
-  @@id([gzzol001, gzzol002])
-  @@map("gzzol_t")
+  @@id([oobient, oobi001, oobi002, oobi003])
+  @@map("oobi_t")
 }
 
-/// 作业授权档 (gzzz_t)
-model GzzzT {
-  gzzzstus  String? // 状态码
-  gzzz001   String    @id // 作业编号
-  gzzz002   String? // 程序编号
-  gzzz003   Int? // 应用参数组编号
-  gzzz004   String? // 额外参数
-  gzzzownid String? // 资料所有者
-  gzzzowndp String? // 资料所有部门
-  gzzzcrtid String? // 资料录入者
-  gzzzcrtdp String? // 资料录入部门
-  gzzzcrtdt DateTime? // 资料创建日
-  gzzzmodid String? // 资料更改者
-  gzzzmoddt DateTime? // 最近更改日
-  gzzz005   String? // 归属模块
-  gzzz006   String? // 默认单据性质
-  gzzz007   String? // 布景编号
-  gzzz008   String? // 色调编号
-  gzzz009   String? // 作业操作模式
-  gzzz010   String? // 归属行业别
-  gzzz011   String? // no_use
+model Oobj {
+  oobjent   Int       // 企业编号
+  oobj001   String    // 参照表号
+  oobj002   String    // 单据别
+  oobj003   String    // 库存标签编号
+  oobjud001 String?   // 自定义栏位(文字)001
+  oobjud002 String?   // 自定义栏位(文字)002
+  oobjud003 String?   // 自定义栏位(文字)003
+  oobjud004 String?   // 自定义栏位(文字)004
+  oobjud005 String?   // 自定义栏位(文字)005
+  oobjud006 String?   // 自定义栏位(文字)006
+  oobjud007 String?   // 自定义栏位(文字)007
+  oobjud008 String?   // 自定义栏位(文字)008
+  oobjud009 String?   // 自定义栏位(文字)009
+  oobjud010 String?   // 自定义栏位(文字)010
+  oobjud011 Float?    // 自定义栏位(数字)011
+  oobjud012 Float?    // 自定义栏位(数字)012
+  oobjud013 Float?    // 自定义栏位(数字)013
+  oobjud014 Float?    // 自定义栏位(数字)014
+  oobjud015 Float?    // 自定义栏位(数字)015
+  oobjud016 Float?    // 自定义栏位(数字)016
+  oobjud017 Float?    // 自定义栏位(数字)017
+  oobjud018 Float?    // 自定义栏位(数字)018
+  oobjud019 Float?    // 自定义栏位(数字)019
+  oobjud020 Float?    // 自定义栏位(数字)020
+  oobjud021 DateTime? // 自定义栏位(日期时间)021
+  oobjud022 DateTime? // 自定义栏位(日期时间)022
+  oobjud023 DateTime? // 自定义栏位(日期时间)023
+  oobjud024 DateTime? // 自定义栏位(日期时间)024
+  oobjud025 DateTime? // 自定义栏位(日期时间)025
+  oobjud026 DateTime? // 自定义栏位(日期时间)026
+  oobjud027 DateTime? // 自定义栏位(日期时间)027
+  oobjud028 DateTime? // 自定义栏位(日期时间)028
+  oobjud029 DateTime? // 自定义栏位(日期时间)029
+  oobjud030 DateTime? // 自定义栏位(日期时间)030
 
-  @@map("gzzz_t")
+  @@id([oobjent, oobj001, oobj002, oobj003])
+  @@map("oobj_t")
 }
+
+model Oobk {
+  oobkent   Int       // 企业编号
+  oobk001   String    // 参照表号
+  oobk002   String    // 单据别
+  oobk003   String    // 库存标签编号
+  oobkud001 String?   // 自定义栏位(文字)001
+  oobkud002 String?   // 自定义栏位(文字)002
+  oobkud003 String?   // 自定义栏位(文字)003
+  oobkud004 String?   // 自定义栏位(文字)004
+  oobkud005 String?   // 自定义栏位(文字)005
+  oobkud006 String?   // 自定义栏位(文字)006
+  oobkud007 String?   // 自定义栏位(文字)007
+  oobkud008 String?   // 自定义栏位(文字)008
+  oobkud009 String?   // 自定义栏位(文字)009
+  oobkud010 String?   // 自定义栏位(文字)010
+  oobkud011 Float?    // 自定义栏位(数字)011
+  oobkud012 Float?    // 自定义栏位(数字)012
+  oobkud013 Float?    // 自定义栏位(数字)013
+  oobkud014 Float?    // 自定义栏位(数字)014
+  oobkud015 Float?    // 自定义栏位(数字)015
+  oobkud016 Float?    // 自定义栏位(数字)016
+  oobkud017 Float?    // 自定义栏位(数字)017
+  oobkud018 Float?    // 自定义栏位(数字)018
+  oobkud019 Float?    // 自定义栏位(数字)019
+  oobkud020 Float?    // 自定义栏位(数字)020
+  oobkud021 DateTime? // 自定义栏位(日期时间)021
+  oobkud022 DateTime? // 自定义栏位(日期时间)022
+  oobkud023 DateTime? // 自定义栏位(日期时间)023
+  oobkud024 DateTime? // 自定义栏位(日期时间)024
+  oobkud025 DateTime? // 自定义栏位(日期时间)025
+  oobkud026 DateTime? // 自定义栏位(日期时间)026
+  oobkud027 DateTime? // 自定义栏位(日期时间)027
+  oobkud028 DateTime? // 自定义栏位(日期时间)028
+  oobkud029 DateTime? // 自定义栏位(日期时间)029
+  oobkud030 DateTime? // 自定义栏位(日期时间)030
+
+  @@id([oobkent, oobk001, oobk002, oobk003])
+  @@map("oobk_t")
+}
+

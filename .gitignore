@@ -25,7 +25,7 @@ dist-ssr
 
 /src/generated/prisma
 
-sources/
 release/
 dist-electron/
 .agents/
+dev-utils/
