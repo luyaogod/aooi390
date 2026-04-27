@@ -29,3 +29,5 @@ release/
 dist-electron/
 .agents/
 dev-utils/
+
+.vscode/

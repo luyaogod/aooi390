@@ -23,10 +23,15 @@ export default defineConfig({
         entry: 'electron/main.ts',
         vite: {
           build: {
+            sourcemap: true,
             rollupOptions: {
               external: ['@prisma/client', 'pg', 'oracledb'],
             },
           },
+        },
+        onstart(args) {
+          // 传入 --inspect=5858 让 VS Code 可以 attach 调试主进程
+          args.startup(['.', '--no-sandbox', '--inspect=5858'])
         },
       },
       preload: {
