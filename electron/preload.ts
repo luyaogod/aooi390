@@ -15,6 +15,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   azzi001Preview: (sourceEnt: number) => ipcRenderer.invoke('azzi001:preview', sourceEnt),
   azzi001SyncAll: (sourceEnt: number, targetEnt: number) => ipcRenderer.invoke('azzi001:sync-all', sourceEnt, targetEnt),
 
+  // Aooi200 校验 API
+  getAooi200EntList: () => ipcRenderer.invoke('aooi200:get-ent-list'),
+  getAooi200Ooba001List: () => ipcRenderer.invoke('aooi200:get-ooba001-list'),
+  aooi200Validate: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => ipcRenderer.invoke('aooi200:validate', entFrom, entTo, dlang, ooba001, mode),
+
   // T100 全局变量 API
   getT100Configs: () => ipcRenderer.invoke('t100:get-configs'),
   getT100ActiveConfig: () => ipcRenderer.invoke('t100:get-active-config'),

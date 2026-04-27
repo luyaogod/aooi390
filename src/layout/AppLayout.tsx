@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import {
   GitBranch,
+  ShieldCheck,
   Settings,
 } from 'lucide-react'
 
@@ -19,6 +20,11 @@ const navItems: NavItem[] = [
     path: '/sync-azzi001',
     label: '同步流程图',
     icon: <GitBranch className="size-4" />,
+  },
+  {
+    path: '/sync-aooi200',
+    label: '单据别校验',
+    icon: <ShieldCheck className="size-4" />,
   },
   {
     path: '/settings',

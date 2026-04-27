@@ -1,5 +1,5 @@
 import { externalDB } from '../db/clients';
-import { 
+import {
     Oobx,
     Ooba,
     Oobb,
@@ -11,10 +11,11 @@ import {
     Oobk
 
 } from '@prisma/client';
+import { dbConnectionManager } from '../config/db-connections';
 import logger from '../utils/logger';
 
 /** 校验错误信息 */
-interface ValidateError {
+export interface ValidateError {
     table: string;      // 表名
     field: string;      // 字段名
     label: string;      // 字段中文名
@@ -23,7 +24,7 @@ interface ValidateError {
 }
 
 /** 校验模式：collect-收集所有错误 | failFast-遇错即停 */
-type ValidateMode = 'collect' | 'failFast';
+export type ValidateMode = 'collect' | 'failFast';
 
 /** 添加校验错误，failFast 模式下返回 true 表示应立即终止 */
 function pushError(errors: ValidateError[], err: ValidateError | null, mode: ValidateMode): boolean {
@@ -669,7 +670,7 @@ async function oobi003Chk(ooba002: string, oobi003: string, entTo: string): Prom
  * @param ooba001  参照表编号
  * @param mode     校验模式：collect-收集所有错误 | failFast-遇错即停
 */
-async function validate(entFrom: string, entTo: string, dlang: string, ooba001: string, mode: ValidateMode = 'collect'): Promise<ValidateError[]> {
+export async function validate(entFrom: string, entTo: string, dlang: string, ooba001: string, mode: ValidateMode = 'collect'): Promise<ValidateError[]> {
     logger.info({ entFrom, entTo, dlang, ooba001, mode }, 'validate: 开始执行校验');
     const errors: ValidateError[] = [];
 
@@ -783,3 +784,113 @@ async function validate(entFrom: string, entTo: string, dlang: string, ooba001: 
     }
     return errors;
 }
+
+// ==================== SyncAooi200Service ====================
+
+/** 校验结果 */
+export interface Aooi200ValidateResult {
+    success: boolean;
+    errors: ValidateError[];
+    message: string;
+}
+
+/**
+ * Aooi200 校验服务
+ * 校验来源集团与目标集团之间的数据一致性
+ */
+export class SyncAooi200Service {
+    /**
+     * 获取所有 ENT 编号列表
+     */
+    public async getEntList(): Promise<number[]> {
+        await this.ensureConnected();
+
+        try {
+            const result = await externalDB.query('SELECT gzou001 FROM gzou_t');
+            const rows = result.rows as Record<string, unknown>[];
+            return rows.map(row => Number(row.gzou001)).filter(n => !isNaN(n));
+        } catch (error) {
+            logger.error(error, '[SyncAooi200Service] 查询ENT列表失败');
+            throw error;
+        }
+    }
+
+    /**
+     * 获取参照表编号列表（从 ooba_t 查询去重的 ooba001）
+     */
+    public async getOoba001List(): Promise<string[]> {
+        await this.ensureConnected();
+
+        try {
+            const result = await externalDB.query('SELECT DISTINCT ooba001 FROM ooba_t ORDER BY ooba001');
+            const rows = result.rows as Record<string, unknown>[];
+            return rows.map(row => String(row.ooba001));
+        } catch (error) {
+            logger.error(error, '[SyncAooi200Service] 查询参照表编号列表失败');
+            throw error;
+        }
+    }
+
+    /**
+     * 执行校验
+     */
+    public async runValidate(
+        entFrom: string,
+        entTo: string,
+        dlang: string,
+        ooba001: string,
+        mode: ValidateMode = 'collect'
+    ): Promise<Aooi200ValidateResult> {
+        await this.ensureConnected();
+
+        try {
+            const errors = await validate(entFrom, entTo, dlang, ooba001, mode);
+            const success = errors.length === 0;
+            const message = success
+                ? '全部校验通过'
+                : `校验完成，共 ${errors.length} 项错误`;
+
+            return { success, errors, message };
+        } catch (error) {
+            logger.error(error, '[SyncAooi200Service] 执行校验失败');
+            return {
+                success: false,
+                errors: [],
+                message: error instanceof Error ? error.message : String(error),
+            };
+        }
+    }
+
+    /**
+     * 确保外部数据库已连接
+     */
+    private async ensureConnected(): Promise<void> {
+        if (externalDB.isConnected) {
+            return;
+        }
+
+        try {
+            await dbConnectionManager.initialize();
+            const defaultConn = dbConnectionManager.getDefaultConnection();
+
+            if (!defaultConn) {
+                throw new Error('未找到默认外部数据库连接配置');
+            }
+
+            await externalDB.connect(
+                defaultConn.type === 'kingbase'
+                    ? { type: 'kingbase', config: defaultConn.config as import('../db/clients').KingbaseConfig }
+                    : { type: 'oracle', config: defaultConn.config as import('../db/clients').OracleConfig }
+            );
+
+            logger.info('[SyncAooi200Service] 外部数据库已连接: %s', defaultConn.name);
+        } catch (error) {
+            logger.error(error, '[SyncAooi200Service] 连接外部数据库失败');
+            throw error;
+        }
+    }
+}
+
+// ==================== 导出便捷实例 ====================
+
+export const syncAooi200Service = new SyncAooi200Service();

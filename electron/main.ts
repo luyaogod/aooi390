@@ -6,6 +6,7 @@ import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
+import { syncAooi200Service } from './core/sync-azzi200'
 import logger from './utils/logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -219,6 +220,43 @@ ipcMain.handle('azzi001:sync-all', async (_event, sourceEnt: number, targetEnt: 
     return {
       success: false,
       results: [],
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+})
+
+// IPC: 获取Aooi200 ENT编号列表
+ipcMain.handle('aooi200:get-ent-list', async () => {
+  try {
+    const entList = await syncAooi200Service.getEntList()
+    return { success: true, entList }
+  } catch (error) {
+    logger.error(error, '[Main] 获取Aooi200 ENT列表失败')
+    return { success: false, error: String(error), entList: [] }
+  }
+})
+
+// IPC: 获取Aooi200参照表编号列表
+ipcMain.handle('aooi200:get-ooba001-list', async () => {
+  try {
+    const ooba001List = await syncAooi200Service.getOoba001List()
+    return { success: true, ooba001List }
+  } catch (error) {
+    logger.error(error, '[Main] 获取Aooi200参照表编号列表失败')
+    return { success: false, error: String(error), ooba001List: [] }
+  }
+})
+
+// IPC: 执行Aooi200校验
+ipcMain.handle('aooi200:validate', async (_event, entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => {
+  try {
+    const result = await syncAooi200Service.runValidate(entFrom, entTo, dlang, ooba001, mode as 'collect' | 'failFast')
+    return result
+  } catch (error) {
+    logger.error(error, '[Main] Aooi200校验失败')
+    return {
+      success: false,
+      errors: [],
       message: error instanceof Error ? error.message : String(error),
     }
   }

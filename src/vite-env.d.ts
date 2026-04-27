@@ -91,6 +91,9 @@ interface ElectronAPI {
   getAzzi001List: () => Promise<{ success: boolean; entList: number[]; error?: string }>
   azzi001Preview: (sourceEnt: number) => Promise<{ success: boolean; preview: Azzi001SyncPreview[]; error?: string }>
   azzi001SyncAll: (sourceEnt: number, targetEnt: number) => Promise<Azzi001SyncAllResult>
+  getAooi200EntList: () => Promise<{ success: boolean; entList: number[]; error?: string }>
+  getAooi200Ooba001List: () => Promise<{ success: boolean; ooba001List: string[]; error?: string }>
+  aooi200Validate: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => Promise<Aooi200ValidateResult>
   getT100Configs: () => Promise<T100ConfigsResult>
   getT100ActiveConfig: () => Promise<T100ActiveConfigResult>
   setT100ActiveConfig: (name: string) => Promise<{ success: boolean }>
@@ -101,6 +104,20 @@ interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI: ElectronAPI
+  }
+
+  interface Aooi200ValidateError {
+    table: string
+    field: string
+    label: string
+    value: string
+    message: string
+  }
+
+  interface Aooi200ValidateResult {
+    success: boolean
+    errors: Aooi200ValidateError[]
+    message: string
   }
 }
 

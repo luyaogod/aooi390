@@ -12,7 +12,7 @@ if (!fs.existsSync(logsDir)) {
 }
 
 const logFilePath = path.join(logsDir, 'app.log');
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = process.env.NODE_ENV === 'development' || !!process.env['VITE_DEV_SERVER_URL'];
 
 const fileDest = pino.destination({ dest: logFilePath, mkdir: true });
 
@@ -39,7 +39,7 @@ if (isDev) {
 } else {
   logger = pino(
     {
-      level: 'info',
+      level: 'debug',
       timestamp: pino.stdTimeFunctions.isoTime,
     },
     fileDest
