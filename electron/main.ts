@@ -300,6 +300,17 @@ ipcMain.handle('param-diff:site-params', async (_event, ent: string, site: strin
   }
 })
 
+// IPC: 查询指定集团的据点列表
+ipcMain.handle('param-diff:sites', async (_event, ent: string) => {
+  try {
+    const sites = await paramDiffService.getSites(ent)
+    return { success: true, sites }
+  } catch (error) {
+    logger.error(error, '[Main] 查询据点列表失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), sites: [] }
+  }
+})
+
 // IPC: 获取 T100 全局变量配置列表
 ipcMain.handle('t100:get-configs', async () => {
   try {

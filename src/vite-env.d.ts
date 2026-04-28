@@ -100,6 +100,7 @@ interface ElectronAPI {
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>
   getSiteParams: (ent: string, site: string, dlang: string) => Promise<{ success: boolean; rows: SiteParamRow[]; error?: string }>
+  getSites: (ent: string) => Promise<{ success: boolean; sites: string[]; error?: string }>
 
   getT100Configs: () => Promise<T100ConfigsResult>
   getT100ActiveConfig: () => Promise<T100ActiveConfigResult>

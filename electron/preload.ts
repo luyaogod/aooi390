@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => ipcRenderer.invoke('param-diff:enterprise-params', ent, dlang),
   getSiteParams: (ent: string, site: string, dlang: string) => ipcRenderer.invoke('param-diff:site-params', ent, site, dlang),
+  getSites: (ent: string) => ipcRenderer.invoke('param-diff:sites', ent),
 
   // T100 全局变量 API
   getT100Configs: () => ipcRenderer.invoke('t100:get-configs'),

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Field } from '@/components/ui/field'
 import {
   Select,
   SelectTrigger,
@@ -41,8 +42,6 @@ import {
 import { toast } from 'sonner'
 
 function SyncAzzi001Page() {
-  const [tables, setTables] = useState<Array<{ tableName: string; entField: string }>>([])
-  const [tablesLoading, setTablesLoading] = useState(true)
 
   const [entList, setEntList] = useState<number[]>([])
   const [entListLoading, setEntListLoading] = useState(true)
@@ -70,20 +69,6 @@ function SyncAzzi001Page() {
       console.error('获取ENT列表失败:', err)
     } finally {
       setEntListLoading(false)
-    }
-  }
-
-  const fetchTables = async () => {
-    setTablesLoading(true)
-    try {
-      const result = await window.electronAPI.getAzzi001SyncTables()
-      if (result.success) {
-        setTables(result.tables)
-      }
-    } catch (err) {
-      console.error('获取Azzi001同步表配置失败:', err)
-    } finally {
-      setTablesLoading(false)
     }
   }
 
@@ -138,11 +123,10 @@ function SyncAzzi001Page() {
   }
 
   useEffect(() => {
-    fetchTables()
     fetchEntList()
   }, [])
 
-  const canPreview = sourceEnt !== '' && targetEnt !== '' && sourceEnt !== targetEnt && tables.length > 0
+  const canPreview = sourceEnt !== '' && targetEnt !== '' && sourceEnt !== targetEnt
   const entDuplicate = sourceEnt !== '' && targetEnt !== '' && sourceEnt === targetEnt
 
   return (
@@ -155,70 +139,62 @@ function SyncAzzi001Page() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4">
-          {tablesLoading || entListLoading ? (
+          {entListLoading ? (
             <div className="flex flex-col gap-2">
               <Skeleton className="h-4 w-1/3" />
               <Skeleton className="h-4 w-1/2" />
             </div>
           ) : (
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <span className="text-muted-foreground">同步表数</span>
-              <span>{tables.length} 张</span>
-              <span className="text-muted-foreground">表名列表</span>
-              <div className="flex flex-wrap gap-1">
-                {tables.map((t) => (
-                  <Badge key={t.tableName} variant="secondary" className="font-mono text-xs">
-                    {t.tableName}
-                  </Badge>
-                ))}
-              </div>
+            <div className="flex flex-col gap-4">
 
-              <span className="text-muted-foreground">源 ENT</span>
-              <Select
-                value={sourceEnt}
-                onValueChange={(value) => {
-                  if (value) setSourceEnt(value)
-                  setPreview([])
-                  setConfirmed(false)
-                  setSyncResult(null)
-                }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择源 ENT" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList
-                      .map((ent) => (
-                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                      ))
-                    }
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Field label="源 ENT">
+                <Select
+                  value={sourceEnt}
+                  onValueChange={(value) => {
+                    if (value) setSourceEnt(value)
+                    setPreview([])
+                    setConfirmed(false)
+                    setSyncResult(null)
+                  }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择源 ENT" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList
+                        .map((ent) => (
+                          <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                        ))
+                      }
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-              <span className="text-muted-foreground">目标 ENT</span>
-              <Select
-                value={targetEnt}
-                onValueChange={(value) => {
-                  if (value) setTargetEnt(value)
-                  setConfirmed(false)
-                  setSyncResult(null)
-                }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择目标 ENT" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList
-                      .map((ent) => (
-                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                      ))
-                    }
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Field label="目标 ENT">
+                <Select
+                  value={targetEnt}
+                  onValueChange={(value) => {
+                    if (value) setTargetEnt(value)
+                    setConfirmed(false)
+                    setSyncResult(null)
+                  }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择目标 ENT" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList
+                        .map((ent) => (
+                          <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                        ))
+                      }
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
           )}
           {entDuplicate && (

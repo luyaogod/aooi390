@@ -31,6 +31,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
+import { Field } from '@/components/ui/field'
 import {
   Loader2,
   ArrowLeftRight,
@@ -135,8 +136,10 @@ function ParamDiffPage() {
   // === 据点级参数 ===
   const [entA2, setEntA2] = useState('')
   const [siteA, setSiteA] = useState('')
+  const [sitesA, setSitesA] = useState<string[]>([])
   const [entB2, setEntB2] = useState('')
   const [siteB, setSiteB] = useState('')
+  const [sitesB, setSitesB] = useState<string[]>([])
   const [siteLoading, setSiteLoading] = useState(false)
   const [siteCompareRows, setSiteCompareRows] = useState<CompareRow[] | null>(null)
   const [siteResultInfo, setSiteResultInfo] = useState<{ labelA: string; labelB: string } | null>(null)
@@ -159,6 +162,30 @@ function ParamDiffPage() {
   useEffect(() => {
     fetchEntList()
   }, [])
+
+  useEffect(() => {
+    if (entA2) {
+      window.electronAPI.getSites(entA2).then(r => {
+        if (r.success) setSitesA(r.sites)
+      })
+    } else {
+      setSitesA([])
+    }
+    setSiteA('')
+    setSiteCompareRows(null)
+  }, [entA2])
+
+  useEffect(() => {
+    if (entB2) {
+      window.electronAPI.getSites(entB2).then(r => {
+        if (r.success) setSitesB(r.sites)
+      })
+    } else {
+      setSitesB([])
+    }
+    setSiteB('')
+    setSiteCompareRows(null)
+  }, [entB2])
 
   // === 集团级参数对比 ===
   const canCompareEnt = entA !== '' && entB !== '' && entA !== entB
@@ -328,41 +355,42 @@ function ParamDiffPage() {
               <Skeleton className="h-4 w-1/2" />
             </div>
           ) : (
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <span className="text-muted-foreground">集团 A</span>
-              <Select
-                value={entA}
-                onValueChange={(value) => { if (value) setEntA(value); setEntCompareRows(null) }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择集团 A" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList.map((ent) => (
-                      <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col gap-4">
+              <Field label="集团 A">
+                <Select
+                  value={entA}
+                  onValueChange={(value) => { if (value) setEntA(value); setEntCompareRows(null) }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择集团 A" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList.map((ent) => (
+                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-              <span className="text-muted-foreground">集团 B</span>
-              <Select
-                value={entB}
-                onValueChange={(value) => { if (value) setEntB(value); setEntCompareRows(null) }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择集团 B" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList.map((ent) => (
-                      <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-
+              <Field label="集团 B">
+                <Select
+                  value={entB}
+                  onValueChange={(value) => { if (value) setEntB(value); setEntCompareRows(null) }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择集团 B" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList.map((ent) => (
+                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
           )}
 
@@ -412,57 +440,80 @@ function ParamDiffPage() {
               <Skeleton className="h-4 w-1/2" />
             </div>
           ) : (
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <span className="text-muted-foreground">集团 A</span>
-              <Select
-                value={entA2}
-                onValueChange={(value) => { if (value) setEntA2(value); setSiteCompareRows(null) }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择集团 A" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList.map((ent) => (
-                      <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col gap-4">
+              <Field label="集团 A">
+                <Select
+                  value={entA2}
+                  onValueChange={(value) => { if (value) setEntA2(value); setSiteCompareRows(null) }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择集团 A" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList.map((ent) => (
+                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-              <span className="text-muted-foreground">据点 A</span>
-              <Input
-                value={siteA}
-                onChange={(e) => { setSiteA(e.target.value); setSiteCompareRows(null) }}
-                placeholder="例如：ZB01"
-                className="w-60"
-              />
+              <Field label="据点 A">
+                <Select
+                  value={siteA}
+                  onValueChange={(value) => { if (value) setSiteA(value); setSiteCompareRows(null) }}
+                  disabled={sitesA.length === 0}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder={sitesA.length === 0 ? '请先选择集团' : '选择据点 A'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {sitesA.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-              <span className="text-muted-foreground">集团 B</span>
-              <Select
-                value={entB2}
-                onValueChange={(value) => { if (value) setEntB2(value); setSiteCompareRows(null) }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择集团 B" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList.map((ent) => (
-                      <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Field label="集团 B">
+                <Select
+                  value={entB2}
+                  onValueChange={(value) => { if (value) setEntB2(value); setSiteCompareRows(null) }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择集团 B" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList.map((ent) => (
+                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-              <span className="text-muted-foreground">据点 B</span>
-              <Input
-                value={siteB}
-                onChange={(e) => { setSiteB(e.target.value); setSiteCompareRows(null) }}
-                placeholder="例如：ZB01"
-                className="w-60"
-              />
-
+              <Field label="据点 B">
+                <Select
+                  value={siteB}
+                  onValueChange={(value) => { if (value) setSiteB(value); setSiteCompareRows(null) }}
+                  disabled={sitesB.length === 0}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder={sitesB.length === 0 ? '请先选择集团' : '选择据点 B'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {sitesB.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
           )}
 

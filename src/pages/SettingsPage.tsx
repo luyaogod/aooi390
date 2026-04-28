@@ -23,6 +23,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
+import { Field } from '@/components/ui/field'
 import {
   RefreshCw,
   AlertCircle,
@@ -292,22 +293,20 @@ function SettingsPage() {
               <Skeleton className="h-4 w-2/3" />
             </div>
           ) : (
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <span className="text-muted-foreground">连接状态</span>
-              <span
-                className={cn(
-                  'font-medium',
-                  sqliteStatus?.connected ? 'text-primary' : 'text-destructive'
-                )}
-              >
-                {sqliteStatus?.status}
-              </span>
-              <span className="text-muted-foreground">数据库类型</span>
-              <span>{sqliteStatus?.dbType}</span>
-              <span className="text-muted-foreground">数据库路径</span>
-              <span className="font-mono text-xs text-muted-foreground break-all">
-                {sqliteStatus?.dbPath}
-              </span>
+            <div className="flex flex-col gap-4">
+              <Field label="连接状态">
+                <span className={cn('font-medium text-sm', sqliteStatus?.connected ? 'text-primary' : 'text-destructive')}>
+                  {sqliteStatus?.status}
+                </span>
+              </Field>
+              <Field label="数据库类型">
+                <span className="text-sm">{sqliteStatus?.dbType}</span>
+              </Field>
+              <Field label="数据库路径">
+                <span className="font-mono text-xs text-muted-foreground break-all">
+                  {sqliteStatus?.dbPath}
+                </span>
+              </Field>
             </div>
           )}
 
@@ -366,8 +365,7 @@ function SettingsPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <span className="text-muted-foreground">选择连接</span>
+              <Field label="选择连接">
                 <Select
                   value={selectedConnectionName}
                   onValueChange={(value) => {
@@ -390,22 +388,22 @@ function SettingsPage() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+              </Field>
 
-                {selectedConnection && (
-                  <>
-                    <span className="text-muted-foreground">数据库类型</span>
+              {selectedConnection && (
+                <>
+                  <Field label="数据库类型">
                     <Badge variant="secondary">
                       {selectedConnection.type === 'kingbase' ? 'Kingbase' : 'Oracle'}
                     </Badge>
-                    {selectedConnection.description && (
-                      <>
-                        <span className="text-muted-foreground">描述</span>
-                        <span>{selectedConnection.description}</span>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
+                  </Field>
+                  {selectedConnection.description && (
+                    <Field label="描述">
+                      <span className="text-sm">{selectedConnection.description}</span>
+                    </Field>
+                  )}
+                </>
+              )}
 
               {externalResult && (
                 <Alert
@@ -478,8 +476,7 @@ function SettingsPage() {
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground shrink-0">选择配置</span>
+                <Field label="选择配置">
                   <Select
                     value={selectedName}
                     onValueChange={(value) => {
@@ -506,7 +503,7 @@ function SettingsPage() {
                       </SelectGroup>
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
 
                 {selectedConfig && (
                   <div className="flex flex-wrap gap-1.5">

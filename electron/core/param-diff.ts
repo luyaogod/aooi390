@@ -1,7 +1,7 @@
 import { externalDB } from '../db/clients';
 import { dbConnectionManager } from '../config/db-connections';
 import logger from '../utils/logger';
-import { queryEnt } from '../com-query/external';
+import { queryEnt, querySites } from '../com-query/external';
 
 /** 集团级参数行 */
 export interface EnterpriseParamRow {
@@ -88,6 +88,24 @@ ORDER BY ooabent, ooabsite, ooab001`;
       return result.rows as SiteParamRow[];
     } catch (error) {
       logger.error(error, '[ParamDiffService] 查询据点级参数失败');
+      throw error;
+    }
+  }
+
+  /**
+   * 查询指定集团的据点列表
+   * @param ent 集团编号
+   */
+  public async getSites(ent: string): Promise<string[]> {
+    await this.ensureConnected();
+
+    try {
+      const schemaMap = await resolveSchemaMap();
+      const schema = schemaMap[ent] || ent;
+      logger.debug({ schema, ent }, '[ParamDiffService] 查询据点列表');
+      return await querySites(schema, ent);
+    } catch (error) {
+      logger.error(error, '[ParamDiffService] 查询据点列表失败');
       throw error;
     }
   }

@@ -39,6 +39,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Field } from '@/components/ui/field'
 
 function SyncAooi200Page() {
   const [entList, setEntList] = useState<number[]>([])
@@ -179,52 +180,54 @@ function SyncAooi200Page() {
               <Skeleton className="h-4 w-1/2" />
             </div>
           ) : (
-            <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <span className="text-muted-foreground">来源集团</span>
-              <Select
-                value={ecomSourceEnt}
-                onValueChange={(value) => {
-                  if (value) setEcomSourceEnt(value)
-                  setEcomCheckResult(null)
-                  setValidateResult(null)
-                }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择来源集团" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList
-                      .map((ent) => (
-                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                      ))
-                    }
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-col gap-4">
+              <Field label="来源集团">
+                <Select
+                  value={ecomSourceEnt}
+                  onValueChange={(value) => {
+                    if (value) setEcomSourceEnt(value)
+                    setEcomCheckResult(null)
+                    setValidateResult(null)
+                  }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择来源集团" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList
+                        .map((ent) => (
+                          <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                        ))
+                      }
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
 
-              <span className="text-muted-foreground">目标集团</span>
-              <Select
-                value={ecomTargetEnt}
-                onValueChange={(value) => {
-                  if (value) setEcomTargetEnt(value)
-                  setEcomCheckResult(null)
-                  setValidateResult(null)
-                }}
-              >
-                <SelectTrigger className="w-60">
-                  <SelectValue placeholder="选择目标集团" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {entList
-                      .map((ent) => (
-                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
-                      ))
-                    }
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Field label="目标集团">
+                <Select
+                  value={ecomTargetEnt}
+                  onValueChange={(value) => {
+                    if (value) setEcomTargetEnt(value)
+                    setEcomCheckResult(null)
+                    setValidateResult(null)
+                  }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="选择目标集团" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {entList
+                        .map((ent) => (
+                          <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                        ))
+                      }
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
           )}
 
@@ -307,59 +310,64 @@ function SyncAooi200Page() {
                 <Skeleton className="h-4 w-2/3" />
               </div>
             ) : (
-              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                <span className="text-muted-foreground">来源集团</span>
-                <span className="font-medium">{ecomSourceEnt}</span>
+              <div className="flex flex-col gap-4">
+                <Field label="来源集团">
+                  <span className="font-medium text-sm">{ecomSourceEnt}</span>
+                </Field>
 
-                <span className="text-muted-foreground">目标集团</span>
-                <span className="font-medium">{ecomTargetEnt}</span>
+                <Field label="目标集团">
+                  <span className="font-medium text-sm">{ecomTargetEnt}</span>
+                </Field>
 
-                <span className="text-muted-foreground">语言代码</span>
-                <Input
-                  value={dlang}
-                  onChange={(e) => {
-                    setDlang(e.target.value)
-                    setValidateResult(null)
-                  }}
-                  placeholder="例如：zh_CN"
-                  className="w-60"
-                />
+                <Field label="语言代码">
+                  <Input
+                    value={dlang}
+                    onChange={(e) => {
+                      setDlang(e.target.value)
+                      setValidateResult(null)
+                    }}
+                    placeholder="例如：zh_CN"
+                    className="w-60"
+                  />
+                </Field>
 
-                <span className="text-muted-foreground">参照表编号</span>
-                <Select
-                  value={ooba001}
-                  onValueChange={(value) => {
-                    if (value) setOoba001(value)
-                    setValidateResult(null)
-                  }}
-                >
-                  <SelectTrigger className="w-60">
-                    <SelectValue placeholder="选择参照表编号" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {ooba001List.map((code) => (
-                        <SelectItem key={code} value={code}>{code}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Field label="参照表编号">
+                  <Select
+                    value={ooba001}
+                    onValueChange={(value) => {
+                      if (value) setOoba001(value)
+                      setValidateResult(null)
+                    }}
+                  >
+                    <SelectTrigger className="w-60">
+                      <SelectValue placeholder="选择参照表编号" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {ooba001List.map((code) => (
+                          <SelectItem key={code} value={code}>{code}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-                <span className="text-muted-foreground">校验模式</span>
-                <Select
-                  value={mode}
-                  onValueChange={(value) => setMode(value as 'collect' | 'failFast')}
-                >
-                  <SelectTrigger className="w-60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="collect">收集所有错误</SelectItem>
-                      <SelectItem value="failFast">遇错即停</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <Field label="校验模式">
+                  <Select
+                    value={mode}
+                    onValueChange={(value) => setMode(value as 'collect' | 'failFast')}
+                  >
+                    <SelectTrigger className="w-60">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="collect">收集所有错误</SelectItem>
+                        <SelectItem value="failFast">遇错即停</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
               </div>
             )}
           </CardContent>
