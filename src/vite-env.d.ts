@@ -87,16 +87,25 @@ interface ElectronAPI {
   getSQLiteStatus: () => Promise<SQLiteStatus>
   getExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
   testExternalDBConnection: (connectionName: string) => Promise<ExternalDBTestResult>
+  refreshExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
+  editExternalDBConfig: () => Promise<{ success: boolean; error?: string }>
   getAzzi001SyncTables: () => Promise<{ success: boolean; tables: Azzi001SyncTableConfig[]; error?: string }>
   getAzzi001List: () => Promise<{ success: boolean; entList: number[]; error?: string }>
   azzi001Preview: (sourceEnt: number) => Promise<{ success: boolean; preview: Azzi001SyncPreview[]; error?: string }>
   azzi001SyncAll: (sourceEnt: number, targetEnt: number) => Promise<Azzi001SyncAllResult>
   getAooi200EntList: () => Promise<{ success: boolean; entList: number[]; error?: string }>
-  getAooi200Ooba001List: () => Promise<{ success: boolean; ooba001List: string[]; error?: string }>
+  getAooi200Ooba001List: (ent: number) => Promise<{ success: boolean; ooba001List: string[]; error?: string }>
+  aooi200EcomCheck: (entFrom: string, entTo: string) => Promise<Aooi200ValidateResult>
   aooi200Validate: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => Promise<Aooi200ValidateResult>
+  // 参数差异查询 API
+  getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>
+  getSiteParams: (ent: string, site: string, dlang: string) => Promise<{ success: boolean; rows: SiteParamRow[]; error?: string }>
+
   getT100Configs: () => Promise<T100ConfigsResult>
   getT100ActiveConfig: () => Promise<T100ActiveConfigResult>
   setT100ActiveConfig: (name: string) => Promise<{ success: boolean }>
+  refreshT100Configs: () => Promise<T100ConfigsResult>
+  editT100Config: () => Promise<{ success: boolean; error?: string }>
   on: (channel: string, listener: (...args: unknown[]) => void) => void
   off: (channel: string, listener: (...args: unknown[]) => void) => void
 }
@@ -118,6 +127,27 @@ declare global {
     success: boolean
     errors: Aooi200ValidateError[]
     message: string
+  }
+
+  interface EnterpriseParamRow {
+    ooaaent: string
+    ooaa001: string
+    ooaa002: string
+    gzszl004: string
+    gzszl005: string
+    gzszl006: string
+    gzszl007: string
+  }
+
+  interface SiteParamRow {
+    ooabent: string
+    ooabsite: string
+    ooab001: string
+    ooab002: string
+    gzszl004: string
+    gzszl005: string
+    gzszl006: string
+    gzszl007: string
   }
 }
 

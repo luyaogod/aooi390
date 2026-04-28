@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { appDB, externalDB } from './db/clients'
@@ -7,6 +7,7 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-azzi200'
+import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -237,9 +238,9 @@ ipcMain.handle('aooi200:get-ent-list', async () => {
 })
 
 // IPC: 获取Aooi200参照表编号列表
-ipcMain.handle('aooi200:get-ooba001-list', async () => {
+ipcMain.handle('aooi200:get-ooba001-list', async (_event, ent: number) => {
   try {
-    const ooba001List = await syncAooi200Service.getOoba001List()
+    const ooba001List = await syncAooi200Service.getOoba001List(ent)
     return { success: true, ooba001List }
   } catch (error) {
     logger.error(error, '[Main] 获取Aooi200参照表编号列表失败')
@@ -259,6 +260,43 @@ ipcMain.handle('aooi200:validate', async (_event, entFrom: string, entTo: string
       errors: [],
       message: error instanceof Error ? error.message : String(error),
     }
+  }
+})
+
+// IPC: 执行Aooi200 E-COM 参数检查
+ipcMain.handle('aooi200:ecom-check', async (_event, entFrom: string, entTo: string) => {
+  try {
+    const result = await syncAooi200Service.runEcomCheck(entFrom, entTo)
+    return result
+  } catch (error) {
+    logger.error(error, '[Main] Aooi200 E-COM 参数检查失败')
+    return {
+      success: false,
+      errors: [],
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+})
+
+// IPC: 查询集团级参数
+ipcMain.handle('param-diff:enterprise-params', async (_event, ent: string, dlang: string) => {
+  try {
+    const rows = await paramDiffService.getEnterpriseParams(ent, dlang)
+    return { success: true, rows }
+  } catch (error) {
+    logger.error(error, '[Main] 查询集团级参数失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), rows: [] }
+  }
+})
+
+// IPC: 查询据点级参数
+ipcMain.handle('param-diff:site-params', async (_event, ent: string, site: string, dlang: string) => {
+  try {
+    const rows = await paramDiffService.getSiteParams(ent, site, dlang)
+    return { success: true, rows }
+  } catch (error) {
+    logger.error(error, '[Main] 查询据点级参数失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), rows: [] }
   }
 })
 
@@ -319,6 +357,91 @@ ipcMain.handle('t100:set-active-config', async (_event, name: string) => {
   } catch (error) {
     logger.error(error, '[Main] 切换T100配置失败')
     return { success: false }
+  }
+})
+
+// IPC: 用系统默认程序打开配置文件
+ipcMain.handle('config:open-file', async (_event, filePath: string) => {
+  try {
+    const result = await shell.openPath(filePath)
+    if (result) {
+      logger.warn('[Main] 打开文件失败: %s, 错误: %s', filePath, result)
+      return { success: false, error: result }
+    }
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 打开文件失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 刷新外部数据库连接配置
+ipcMain.handle('db:refresh-connections', async () => {
+  try {
+    await dbConnectionManager.reload()
+    const connections = dbConnectionManager.getAllConnections()
+    return {
+      success: true,
+      connections: connections.map(conn => ({
+        name: conn.name,
+        type: conn.type,
+        isDefault: conn.isDefault,
+        description: conn.description,
+      })),
+    }
+  } catch (error) {
+    logger.error(error, '[Main] 刷新外部数据库连接配置失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), connections: [] }
+  }
+})
+
+// IPC: 编辑外部数据库配置文件
+ipcMain.handle('db:edit-config', async () => {
+  try {
+    const filePath = dbConnectionManager.getConfigFilePath()
+    const result = await shell.openPath(filePath)
+    if (result) {
+      return { success: false, error: result }
+    }
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 打开外部数据库配置文件失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 刷新 T100 全局变量配置
+ipcMain.handle('t100:refresh-configs', async () => {
+  try {
+    await t100GlobalManager.reload()
+    const configs = t100GlobalManager.getAllConfigs()
+    return {
+      success: true,
+      configs: configs.map(c => ({
+        name: c.name,
+        globals: c.globals,
+        isDefault: c.isDefault,
+        description: c.description,
+      })),
+    }
+  } catch (error) {
+    logger.error(error, '[Main] 刷新T100全局配置失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), configs: [] }
+  }
+})
+
+// IPC: 编辑 T100 全局变量配置文件
+ipcMain.handle('t100:edit-config', async () => {
+  try {
+    const filePath = t100GlobalManager.getConfigFilePath()
+    const result = await shell.openPath(filePath)
+    if (result) {
+      return { success: false, error: result }
+    }
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 打开T100配置文件失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 

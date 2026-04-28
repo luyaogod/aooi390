@@ -275,6 +275,15 @@ export class DBConnectionManager {
   }
 
   /**
+   * 重新加载配置文件
+   */
+  public async reload(): Promise<void> {
+    await this.loadFromFile();
+    logger.info('[DBConnectionManager] 配置已重新加载');
+    this.initialized = true;
+  }
+
+  /**
    * 导出配置为 JSON 字符串
    */
   public exportToJSON(): string {

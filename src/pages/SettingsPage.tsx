@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   XCircle,
   Globe,
+  Pencil,
 } from 'lucide-react'
 
 interface SQLiteStatus {
@@ -182,6 +183,74 @@ function SettingsPage() {
       console.error('切换T100配置失败:', err)
     } finally {
       switchingRef.current = false
+    }
+  }
+
+  // === 编辑 & 刷新配置文件 ===
+  const [refreshingDB, setRefreshingDB] = useState(false)
+  const [refreshingT100, setRefreshingT100] = useState(false)
+
+  const handleEditExternalDBConfig = async () => {
+    try {
+      const result = await window.electronAPI.editExternalDBConfig()
+      if (!result.success) {
+        toast.error('打开配置文件失败: ' + (result.error || '未知错误'))
+      }
+    } catch (err) {
+      toast.error('打开配置文件失败: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  const handleRefreshExternalDB = async () => {
+    setRefreshingDB(true)
+    try {
+      const result = await window.electronAPI.refreshExternalDBConnections()
+      if (result.success) {
+        setConnections(result.connections)
+        const defaultConn = result.connections.find(c => c.isDefault)
+        if (defaultConn) {
+          setSelectedConnectionName(defaultConn.name)
+        } else if (result.connections.length > 0) {
+          setSelectedConnectionName(result.connections[0].name)
+        }
+        toast.success('外部数据库配置已刷新')
+      }
+    } catch (err) {
+      toast.error('刷新配置失败')
+    } finally {
+      setRefreshingDB(false)
+    }
+  }
+
+  const handleEditT100Config = async () => {
+    try {
+      const result = await window.electronAPI.editT100Config()
+      if (!result.success) {
+        toast.error('打开配置文件失败: ' + (result.error || '未知错误'))
+      }
+    } catch (err) {
+      toast.error('打开配置文件失败: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  const handleRefreshT100Configs = async () => {
+    setRefreshingT100(true)
+    try {
+      const result = await window.electronAPI.refreshT100Configs()
+      if (result.success) {
+        setConfigs(result.configs)
+        const active = result.configs.find(c => c.isDefault)
+        if (active) {
+          setSelectedName(active.name)
+        } else if (result.configs.length > 0) {
+          setSelectedName(result.configs[0].name)
+        }
+        toast.success('T100 配置已刷新')
+      }
+    } catch (err) {
+      toast.error('刷新配置失败')
+    } finally {
+      setRefreshingT100(false)
     }
   }
 
@@ -355,7 +424,7 @@ function SettingsPage() {
           )}
         </CardContent>
 
-        <CardFooter>
+        <CardFooter className="flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -365,6 +434,25 @@ function SettingsPage() {
           >
             <Plug className="size-3.5" />
             {externalLoading ? '测试中...' : '测试连接'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleEditExternalDBConfig}
+            className="gap-1.5"
+          >
+            <Pencil className="size-3.5" />
+            编辑配置文件
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshExternalDB}
+            disabled={refreshingDB}
+            className="gap-1.5"
+          >
+            <RefreshCw className={cn('size-3.5', refreshingDB && 'animate-spin')} />
+            {refreshingDB ? '刷新中...' : '刷新配置'}
           </Button>
         </CardFooter>
       </Card>
@@ -453,8 +541,27 @@ function SettingsPage() {
           )}
         </CardContent>
 
-        {configs.length > 0 && (
-          <CardFooter>
+        <CardFooter className="flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleEditT100Config}
+            className="gap-1.5"
+          >
+            <Pencil className="size-3.5" />
+            编辑配置文件
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefreshT100Configs}
+            disabled={refreshingT100}
+            className="gap-1.5"
+          >
+            <RefreshCw className={cn('size-3.5', refreshingT100 && 'animate-spin')} />
+            {refreshingT100 ? '刷新中...' : '刷新配置'}
+          </Button>
+          {configs.length > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -465,8 +572,8 @@ function SettingsPage() {
               <Globe className="size-3.5" />
               {isAlreadyActive ? '当前配置' : '切换为此配置'}
             </Button>
-          </CardFooter>
-        )}
+          )}
+        </CardFooter>
       </Card>
     </div>
   )

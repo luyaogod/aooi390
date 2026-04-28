@@ -38,6 +38,7 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 function SyncAzzi001Page() {
   const [tables, setTables] = useState<Array<{ tableName: string; entField: string }>>([])
@@ -89,6 +90,10 @@ function SyncAzzi001Page() {
   const handlePreview = async () => {
     const src = Number(sourceEnt)
     if (!src) return
+    if (sourceEnt === targetEnt) {
+      toast.error('源 ENT 和目标 ENT 不能相同')
+      return
+    }
 
     setPreviewLoading(true)
     setPreview([])
@@ -184,7 +189,6 @@ function SyncAzzi001Page() {
                 <SelectContent>
                   <SelectGroup>
                     {entList
-                      .filter(ent => String(ent) !== targetEnt)
                       .map((ent) => (
                         <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
                       ))
@@ -208,7 +212,6 @@ function SyncAzzi001Page() {
                 <SelectContent>
                   <SelectGroup>
                     {entList
-                      .filter(ent => String(ent) !== sourceEnt)
                       .map((ent) => (
                         <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
                       ))

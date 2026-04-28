@@ -106,6 +106,21 @@ export class T100GlobalManager {
   }
 
   /**
+   * 获取配置文件路径
+   */
+  public getConfigFilePath(): string {
+    return this.configFilePath;
+  }
+
+  /**
+   * 重新加载配置文件
+   */
+  public async reload(): Promise<void> {
+    await this.loadFromFile();
+    logger.info('[T100GlobalManager] 配置已重新加载');
+  }
+
+  /**
    * 切换当前激活的配置
    * @param name 要激活的配置名称
    */

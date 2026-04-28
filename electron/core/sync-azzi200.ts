@@ -852,18 +852,50 @@ export class SyncAooi200Service {
     }
 
     /**
-     * 获取参照表编号列表（从 ooba_t 查询去重的 ooba001）
+     * 获取参照表编号列表（从 ooal_t 查询，按 ENT 过滤）
+     * @param ent 集团代码
      */
-    public async getOoba001List(): Promise<string[]> {
+    public async getOoba001List(ent: number): Promise<string[]> {
         await this.ensureConnected();
 
         try {
-            const result = await externalDB.query('SELECT DISTINCT ooba001 FROM ooba_t ORDER BY ooba001');
+            const schemaMap = await resolveSchemaMap();
+            const schema = schemaMap[String(ent)] || String(ent);
+            const result = await externalDB.query(`SELECT ooal002 FROM ${schema}.ooal_t WHERE ooal001 = 3 AND ooalent = ${ent}`);
             const rows = result.rows as Record<string, unknown>[];
-            return rows.map(row => String(row.ooba001));
+            return rows.map(row => String(row.ooal002));
         } catch (error) {
             logger.error(error, '[SyncAooi200Service] 查询参照表编号列表失败');
             throw error;
+        }
+    }
+
+    /**
+     * 执行 E-COM 参数双集团一致性检查
+     * @param entFrom 来源集团代码
+     * @param entTo   目标集团代码
+     */
+    public async runEcomCheck(entFrom: string, entTo: string): Promise<Aooi200ValidateResult> {
+        await this.ensureConnected();
+
+        try {
+            const schemaMap = await resolveSchemaMap();
+            const schemaFrom = schemaMap[entFrom] || entFrom;
+            const schemaTo = schemaMap[entTo] || entTo;
+            const errors = await ooaaEcomChk(entFrom, entTo, schemaFrom, schemaTo);
+            const success = errors.length === 0;
+            const message = success
+                ? 'E-COM 参数双集团一致性检查通过'
+                : `E-COM 参数检查完成，共 ${errors.length} 项不一致`;
+
+            return { success, errors, message };
+        } catch (error) {
+            logger.error(error, '[SyncAooi200Service] E-COM 参数检查失败');
+            return {
+                success: false,
+                errors: [],
+                message: error instanceof Error ? error.message : String(error),
+            };
         }
     }
 
