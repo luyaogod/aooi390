@@ -248,10 +248,21 @@ ipcMain.handle('aooi200:get-ooba001-list', async (_event, ent: number) => {
   }
 })
 
-// IPC: 执行Aooi199校验（单据别字段校验）
-ipcMain.handle('aooi200:validate-aooi199', async (_event, entFrom: string, entTo: string, dlang: string, mode: string) => {
+// IPC: 获取系统分类码选项
+ipcMain.handle('aooi200:get-scc-options', async (_event, scc: string) => {
   try {
-    const result = await syncAooi200Service.runValidateAooi199(entFrom, entTo, dlang, mode as 'collect' | 'failFast')
+    const rows = await syncAooi200Service.getSccOptions(scc)
+    return { success: true, rows }
+  } catch (error) {
+    logger.error(error, '[Main] 获取SCC选项失败')
+    return { success: false, rows: [], error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 执行Aooi199校验（单据别字段校验）
+ipcMain.handle('aooi200:validate-aooi199', async (_event, entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => {
+  try {
+    const result = await syncAooi200Service.runValidateAooi199(entFrom, entTo, dlang, mode as 'collect' | 'failFast', oobx006, recalculate)
     return result
   } catch (error) {
     logger.error(error, '[Main] Aooi199校验失败')

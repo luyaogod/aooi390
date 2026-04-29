@@ -13,7 +13,7 @@ import {
 } from '@prisma/client';
 import { dbConnectionManager } from '../config/db-connections';
 import logger from '../utils/logger';
-import { queryEnt } from '../com-query/external';
+import { queryEnt, queryScc } from '../com-query/external';
 
 /** 校验错误信息 */
 export interface ValidateError {
@@ -60,10 +60,20 @@ async function ooaaEcomChk(entFrom: string, entTo: string, schemaFrom: string, s
     const paramCodes = ['E-COM-0001', 'E-COM-0002', 'E-COM-0003', 'E-COM-0004', 'E-COM-0005', 'E-COM-0008'];
     const errors: ValidateError[] = [];
 
-    const sql_ooaa_from = `SELECT ooaa001, ooaa002 FROM ${schemaFrom}.ooaa_t WHERE ooaaent = '${entFrom}' AND ooaa001 IN ('${paramCodes.join("','")}')`;
+    const sql_ooaa_from = `
+        SELECT ooaa001, ooaa002
+        FROM ${schemaFrom}.ooaa_t
+        WHERE ooaaent = '${entFrom}'
+          AND ooaa001 IN ('${paramCodes.join("','")}')
+        `;
     logger.debug({ sql: sql_ooaa_from }, 'ooaaEcomChk: 查询来源集团 E-COM 参数');
     const fromResult = await externalDB.query(sql_ooaa_from);
-    const sql_ooaa_to = `SELECT ooaa001, ooaa002 FROM ${schemaTo}.ooaa_t WHERE ooaaent = '${entTo}' AND ooaa001 IN ('${paramCodes.join("','")}')`;
+    const sql_ooaa_to = `
+        SELECT ooaa001, ooaa002
+        FROM ${schemaTo}.ooaa_t
+        WHERE ooaaent = '${entTo}'
+          AND ooaa001 IN ('${paramCodes.join("','")}')
+        `;
     logger.debug({ sql: sql_ooaa_to }, 'ooaaEcomChk: 查询目标集团 E-COM 参数');
     const toResult = await externalDB.query(sql_ooaa_to);
 
@@ -101,25 +111,38 @@ async function ooaaEcomChk(entFrom: string, entTo: string, schemaFrom: string, s
 }
 
 /** 
- * 校验单据别在目标集团是否存在，且长度是否符合 E-COM-0001 参数设定
+ * 校验单据别在目标集团是否重复，且长度是否符合 E-COM-0001 参数设定
  * @param oobx001  单据别
  * @param entTo    集团代码
  * @param schemaTo 目标集团 schema
  * @returns     校验结果
 */
-async function oobx001Chk(oobx001: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
-    logger.debug({ oobx001, entTo, schemaTo }, 'oobx001Chk: 校验单据别在目标集团是否存在及长度');
-    const sql_oobx_count = `SELECT COUNT(*) AS cnt FROM ${schemaTo}.oobx_t WHERE oobxent = '${entTo}' AND oobx001 = '${oobx001}'`;
-    logger.debug({ sql: sql_oobx_count }, 'oobx001Chk: 查询单据别是否存在');
-    const countResult = await externalDB.query(sql_oobx_count);
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+async function oobx001Chk(oobx001: string, entTo: string, schemaTo: string, chkDup: boolean = false): Promise<ValidateError | null> {
+    logger.debug({ oobx001, entTo, schemaTo }, 'oobx001Chk: 校验单据别在目标集团是否重复及长度');
+    
+    if (chkDup){
+        const sql_oobx_count = `
+            SELECT COUNT(*) AS cnt
+            FROM ${schemaTo}.oobx_t
+            WHERE oobxent = '${entTo}'
+            AND oobx001 = '${oobx001}'
+            `;
+        logger.debug({ sql: sql_oobx_count }, 'oobx001Chk: 查询单据别是否存在');
+        const countResult = await externalDB.query(sql_oobx_count);
+        const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
 
-    if (count === 0) {
-        logger.warn({ oobx001, entTo }, 'oobx001Chk: 单据别在目标集团中不存在');
-        return { table: 'oobx_t', field: 'oobx001', label: '单据别', value: oobx001, message: `[oobx_t] 单据别 [${oobx001}] 在目标集团 [${entTo}] 中不存在` };
+        if (count > 0) {
+            logger.warn({ oobx001, entTo }, 'oobx001Chk: 单据别在目标集团中已存在不可重复');
+            return { table: 'oobx_t', field: 'oobx001', label: '单据别', value: oobx001, message: `[oobx_t] 单据别 [${oobx001}] 在目标集团 [${entTo}] 中已存在不可重复` };
+        }
     }
 
-    const sql_ooaa_ecom0001 = `SELECT ooaa002 FROM ${schemaTo}.ooaa_t WHERE ooaaent = '${entTo}' AND ooaa001 = 'E-COM-0001'`;
+    const sql_ooaa_ecom0001 = `
+        SELECT ooaa002
+        FROM ${schemaTo}.ooaa_t
+        WHERE ooaaent = '${entTo}'
+          AND ooaa001 = 'E-COM-0001'
+        `;
     logger.debug({ sql: sql_ooaa_ecom0001 }, 'oobx001Chk: 查询 E-COM-0001 参数');
     const paramResult = await externalDB.query(sql_ooaa_ecom0001);
     const rows = paramResult.rows as Record<string, unknown>[];
@@ -139,71 +162,88 @@ async function oobx001Chk(oobx001: string, entTo: string, schemaTo: string): Pro
     return null;
 }
 
-/** 
+/**
  * @param oobx002 模组别
+ * @param oobx001  单据别
  * @param schemaTo 目标集团 schema
  * @returns     校验结果
 */
-async function oobx002Chk(oobx002: string, schemaTo: string): Promise<ValidateError | null> {
-    logger.debug({ oobx002, schemaTo }, 'oobx002Chk: 校验模组别是否存在');
-    const sql_gzzj_count = `SELECT COUNT(*) AS cnt FROM ${schemaTo}.gzzj_t WHERE gzzj001 = '${oobx002}'`;
+async function oobx002Chk(oobx002: string, oobx001: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ oobx002, oobx001, schemaTo }, 'oobx002Chk: 校验模组别是否存在');
+    const sql_gzzj_count = `
+        SELECT COUNT(*) AS cnt
+        FROM ${schemaTo}.gzzj_t
+        WHERE gzzj001 = '${oobx002}'
+        `;
     logger.debug({ sql: sql_gzzj_count }, 'oobx002Chk: 查询模组别是否存在');
     const countResult = await externalDB.query(sql_gzzj_count);
     const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
-    
+
     if (count === 0) {
-        logger.warn({ oobx002 }, 'oobx002Chk: 模组别不存在');
-        return { table: 'oobx_t', field: 'oobx002', label: '模组别', value: oobx002, message: `[oobx_t] 模组别 [${oobx002}] 在系统编码表(gzzj_t)中不存在` };
+        logger.warn({ oobx002, oobx001 }, 'oobx002Chk: 模组别不存在');
+        return { table: 'oobx_t', field: 'oobx002', label: '模组别', value: oobx002, message: `[oobx_t] 单据别 [${oobx001}] 的模组别 [${oobx002}] 在系统编码表(gzzj_t)中不存在` };
     }
-    logger.debug({ oobx002 }, 'oobx002Chk: 校验通过');
+    logger.debug({ oobx002, oobx001 }, 'oobx002Chk: 校验通过');
     return null;
 }
 
-/** 
+/**
  * @param oobx003  单据性质
+ * @param oobx001  单据别
  * @param schemaTo 目标集团 schema
  * @returns     校验结果
 */
-async function oobx003Chk(oobx003: string, schemaTo: string): Promise<ValidateError | null> {
-    logger.debug({ oobx003, schemaTo }, 'oobx003Chk: 校验单据性质是否存在');
-    const sql_gzcb_count = `SELECT COUNT(*) AS cnt FROM ${schemaTo}.gzcb_t WHERE gzcb001 = '24' AND gzcb002 = '${oobx003}'`;
+async function oobx003Chk(oobx003: string, oobx001: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ oobx003, oobx001, schemaTo }, 'oobx003Chk: 校验单据性质是否存在');
+    const sql_gzcb_count = `
+        SELECT COUNT(*) AS cnt
+        FROM ${schemaTo}.gzcb_t
+        WHERE gzcb001 = '24'
+          AND gzcb002 = '${oobx003}'
+        `;
     logger.debug({ sql: sql_gzcb_count }, 'oobx003Chk: 查询单据性质是否存在');
     const countResult = await externalDB.query(sql_gzcb_count);
     const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
 
     if (count === 0) {
-        logger.warn({ oobx003 }, 'oobx003Chk: 单据性质不存在');
-        return { table: 'oobx_t', field: 'oobx003', label: '单据性质', value: oobx003, message: `[oobx_t] 单据性质 [${oobx003}] 在一般分类码表(gzcb_t, 分类码号=24)中不存在` };
+        logger.warn({ oobx003, oobx001 }, 'oobx003Chk: 单据性质不存在');
+        return { table: 'oobx_t', field: 'oobx003', label: '单据性质', value: oobx003, message: `[oobx_t] 单据别 [${oobx001}] 的单据性质 [${oobx003}] 在一般分类码表(gzcb_t, 分类码号=24)中不存在` };
     }
-    logger.debug({ oobx003 }, 'oobx003Chk: 校验通过');
+    logger.debug({ oobx003, oobx001 }, 'oobx003Chk: 校验通过');
     return null;
 }
 
-/** 
+/**
  * @param oobx004  作业编号
  * @param oobx003  单据性质
+ * @param oobx001  单据别
  * @param schemaTo 目标集团 schema
  * @returns     校验结果
 */
-async function oobx004Chk(oobx004: string, oobx003: string, schemaTo: string): Promise<ValidateError | null> {
-    logger.debug({ oobx004, oobx003, schemaTo }, 'oobx004Chk: 校验对应作业编号');
+async function oobx004Chk(oobx004: string, oobx003: string, oobx001: string, schemaTo: string): Promise<ValidateError | null> {
+    
+    logger.debug({ oobx004, oobx003, oobx001, schemaTo }, 'oobx004Chk: 校验对应作业编号');
     if (oobx004 === 'MULTI'){
         logger.debug('oobx004Chk: 作业编号为 MULTI，跳过校验');
         return null;
     }
-    const sql_gzzz_count = `SELECT COUNT(*) AS cnt FROM ${schemaTo}.gzzz_t WHERE gzzz001 = '${oobx004}'`;
+    const sql_gzzz_count = `
+        SELECT COUNT(*) AS cnt
+        FROM ${schemaTo}.gzzz_t
+        WHERE gzzz001 = '${oobx004}'
+        `;
     logger.debug({ sql: sql_gzzz_count }, 'oobx004Chk: 查询作业编号是否存在');
     const countResult = await externalDB.query(sql_gzzz_count);
     const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
 
     if (count === 0) {
-        logger.warn({ oobx004 }, 'oobx004Chk: 对应作业编号不存在');
-        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 对应作业编号 [${oobx004}] 在程序编码表(gzzz_t)中不存在` };
+        logger.warn({ oobx004, oobx001 }, 'oobx004Chk: 对应作业编号不存在');
+        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 单据别 [${oobx001}] 的对应作业编号 [${oobx004}] 在程序编码表(gzzz_t)中不存在` };
     }
 
     const sql_gzza_join = `
         SELECT COUNT(gzza001), gzzz006, gzza002
-        FROM ${schemaTo}.gzza_t 
+        FROM ${schemaTo}.gzza_t
         LEFT JOIN ${schemaTo}.gzzz_t ON gzza001 = gzzz002
         WHERE gzzz001 = '${oobx004}'
         `;
@@ -213,32 +253,32 @@ async function oobx004Chk(oobx004: string, oobx003: string, schemaTo: string): P
     const rows = gzzaResult.rows as Record<string, unknown>[];
 
     if (rows.length === 0) {
-        logger.warn({ oobx004 }, 'oobx004Chk: 作业编号关联的程序模块查询无结果');
-        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 对应作业编号 [${oobx004}] 关联的程序模块(gzza_t)查询无结果` };
+        logger.warn({ oobx004, oobx001 }, 'oobx004Chk: 作业编号关联的程序模块查询无结果');
+        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 单据别 [${oobx001}] 的对应作业编号 [${oobx004}] 关联的程序模块(gzza_t)查询无结果` };
     }
 
     const gzza001Count = Number(rows[0]['gzza001']);
 
     if (gzza001Count === 0) {
-        logger.warn({ oobx004 }, 'oobx004Chk: 作业编号关联的程序模块查询无结果');
-        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 对应作业编号 [${oobx004}] 关联的程序模块(gzza_t)查询无结果` };
+        logger.warn({ oobx004, oobx001 }, 'oobx004Chk: 作业编号关联的程序模块查询无结果');
+        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 单据别 [${oobx001}] 的对应作业编号 [${oobx004}] 关联的程序模块(gzza_t)查询无结果` };
     }
 
     const gzzz006 = rows[0]['gzzz006'];
 
     if (gzzz006 !== oobx003) {
-        logger.warn({ oobx004, gzzz006, oobx003 }, 'oobx004Chk: 作业编号的单据性质与当前单据性质不匹配');
-        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 对应作业编号 [${oobx004}] 的单据性质 [${gzzz006}] 与当前单据性质 [${oobx003}] 不匹配` };
+        logger.warn({ oobx004, gzzz006, oobx003, oobx001 }, 'oobx004Chk: 作业编号的单据性质与当前单据性质不匹配');
+        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 单据别 [${oobx001}] 的对应作业编号 [${oobx004}] 不归属于单据性质 [${oobx003}] 不匹配` };
     }
 
-    const gzzz002 = rows[0]['gzzz002'];
+    const gzza002 = rows[0]['gzza002'];
 
-    if (gzzz002 !== 'T' && gzzz002 !== 'Q') {
-        logger.warn({ oobx004, gzzz002 }, 'oobx004Chk: 作业编号的程序类型不合法');
-        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 对应作业编号 [${oobx004}] 的程序类型 [${gzzz002}] 不合法，仅允许 T(交易) 或 Q(查询)` };
+    if (gzza002 !== 'T' && gzza002 !== 'Q') {
+        logger.warn({ oobx004, gzza002, oobx001 }, 'oobx004Chk: 作业编号的程序类型不合法');
+        return { table: 'oobx_t', field: 'oobx004', label: '对应作业编号', value: oobx004, message: `[oobx_t] 单据别 [${oobx001}] 的对应作业编号 [${oobx004}] 的程序类型 [${gzza002}] 不合法，仅允许 T(交易) 或 Q(查询)` };
     }
 
-    logger.debug({ oobx004 }, 'oobx004Chk: 校验通过');
+    logger.debug({ oobx004, oobx001 }, 'oobx004Chk: 校验通过');
 
     return null;
 }
@@ -256,8 +296,8 @@ async function oobx007Chk(oobx007: number | null, oobx001: string, oobx006: stri
     logger.debug({ oobx007, oobx001, oobx006, dlang, entTo, schemaTo }, 'oobx007Chk: 校验所剩流水号长度');
     const expected = await oobx007Get(oobx001, oobx006, dlang, entTo, schemaTo);
     if (String(oobx007 ?? '') !== expected) {
-        logger.warn({ oobx007, expected }, 'oobx007Chk: 所剩流水号长度与计算值不符');
-        return { table: 'oobx_t', field: 'oobx007', label: '所剩流水号长度', value: String(oobx007 ?? ''), message: `[oobx_t] 所剩流水号长度 [${oobx007 ?? ''}] 与根据 E-COM 参数计算值 [${expected}] 不符` };
+        logger.warn({ oobx007, expected, oobx001 }, 'oobx007Chk: 所剩流水号长度与计算值不符');
+        return { table: 'oobx_t', field: 'oobx007', label: '所剩流水号长度', value: String(oobx007 ?? ''), message: `[oobx_t] 单据别 [${oobx001}] 的所剩流水号长度 [${oobx007 ?? ''}] 与根据 E-COM 参数计算值 [${expected}] 不符` };
     }
     logger.debug({ oobx007, expected }, 'oobx007Chk: 校验通过');
     return null;
@@ -278,8 +318,8 @@ async function oobx008Chk(oobx008: string | null, oobx001: string, oobx005: stri
     logger.debug({ oobx008, oobx001, oobx005, oobx006, oobx007, dlang, entTo, schemaTo }, 'oobx008Chk: 校验编码结果');
     const expected = await oobx008Get(oobx001, oobx005, oobx006, oobx007, dlang, entTo, schemaTo);
     if (String(oobx008 ?? '') !== expected) {
-        logger.warn({ oobx008, expected }, 'oobx008Chk: 编码结果与计算值不符');
-        return { table: 'oobx_t', field: 'oobx008', label: '编码结果', value: String(oobx008 ?? ''), message: `[oobx_t] 编码结果 [${oobx008 ?? ''}] 与根据单据别/控制组/期别码/流水号长度计算值 [${expected}] 不符` };
+        logger.warn({ oobx008, expected, oobx001 }, 'oobx008Chk: 编码结果与计算值不符');
+        return { table: 'oobx_t', field: 'oobx008', label: '编码结果', value: String(oobx008 ?? ''), message: `[oobx_t] 单据别 [${oobx001}] 的编码结果 [${oobx008 ?? ''}] 与计算值 [${expected}] 不符` };
     }
     logger.debug({ oobx008, expected }, 'oobx008Chk: 校验通过');
     return null;
@@ -302,7 +342,12 @@ async function oobx007Get( oobx001: string, oobx006: string, dlang: string, entT
     }   
 
     // 获取参数 E-COM-0001~0005
-    const sql_ooaa_params_007 = `SELECT ooaa001, ooaa002 FROM ${schemaTo}.ooaa_t WHERE ooaaent = '${entTo}' AND ooaa001 IN ('E-COM-0001','E-COM-0002','E-COM-0003','E-COM-0004','E-COM-0005')`;
+    const sql_ooaa_params_007 = `
+        SELECT ooaa001, ooaa002
+        FROM ${schemaTo}.ooaa_t
+        WHERE ooaaent = '${entTo}'
+          AND ooaa001 IN ('E-COM-0001','E-COM-0002','E-COM-0003','E-COM-0004','E-COM-0005')
+        `;
     logger.debug({ sql: sql_ooaa_params_007 }, 'oobx007Get: 查询 E-COM 参数');
     const paramResult = await externalDB.query(sql_ooaa_params_007);
     const paramRows = paramResult.rows as Record<string, unknown>[];
@@ -322,7 +367,13 @@ async function oobx007Get( oobx001: string, oobx006: string, dlang: string, entT
 
     // 查询 gzcbl_t 获取字段长度
     let l_length = 0;
-    const sql_gzcbl_length = `SELECT LENGTH(gzcbl004) AS col_length FROM ${schemaTo}.gzcbl_t WHERE gzcbl001 = '14' AND gzcbl002 = '${oobx006}' AND gzcbl003 = '${dlang}'`;
+    const sql_gzcbl_length = `
+        SELECT LENGTH(gzcbl004) AS col_length
+        FROM ${schemaTo}.gzcbl_t
+        WHERE gzcbl001 = '14'
+          AND gzcbl002 = '${oobx006}'
+          AND gzcbl003 = '${dlang}'
+        `;
     logger.debug({ sql: sql_gzcbl_length }, 'oobx007Get: 查询期别字段长度');
     const lengthResult = await externalDB.query(sql_gzcbl_length);
     const lengthRows = lengthResult.rows as Record<string, unknown>[];
@@ -354,7 +405,7 @@ async function oobx007Get( oobx001: string, oobx006: string, dlang: string, entT
 
 /** 
  * @param oobx001  单据别
- * @param oobx005  控制组类型
+ * @param oobx005  自动编码否
  * @param oobx006  期别码
  * @param oobx007  所剩流水号长度
  * @param dlang    当前语言
@@ -373,7 +424,12 @@ async function oobx008Get(oobx001: string, oobx005: string, oobx006: string, oob
     }
 
     // 获取参数 E-COM-0001~0005, 0008
-    const sql_ooaa_params_008 = `SELECT ooaa001, ooaa002 FROM ${schemaTo}.ooaa_t WHERE ooaaent = '${entTo}' AND ooaa001 IN ('E-COM-0001','E-COM-0002','E-COM-0003','E-COM-0004','E-COM-0005','E-COM-0008')`;
+    const sql_ooaa_params_008 = `
+        SELECT ooaa001, ooaa002
+        FROM ${schemaTo}.ooaa_t
+        WHERE ooaaent = '${entTo}'
+          AND ooaa001 IN ('E-COM-0001','E-COM-0002','E-COM-0003','E-COM-0004','E-COM-0005','E-COM-0008')
+        `;
     logger.debug({ sql: sql_ooaa_params_008 }, 'oobx008Get: 查询 E-COM 参数');
     const paramResult = await externalDB.query(sql_ooaa_params_008);
     const paramRows = paramResult.rows as Record<string, unknown>[];
@@ -392,7 +448,13 @@ async function oobx008Get(oobx001: string, oobx005: string, oobx006: string, oob
     const ecom008 = paramMap['E-COM-0008'] || '';
 
     // 获取期别对应语言描述
-    const sql_gzcbl_desc = `SELECT gzcbl004 FROM ${schemaTo}.gzcbl_t WHERE gzcbl001 = '14' AND gzcbl002 = '${oobx006}' AND gzcbl003 = '${dlang}'`;
+    const sql_gzcbl_desc = `
+        SELECT gzcbl004
+        FROM ${schemaTo}.gzcbl_t
+        WHERE gzcbl001 = '14'
+          AND gzcbl002 = '${oobx006}'
+          AND gzcbl003 = '${dlang}'
+        `;
     logger.debug({ sql: sql_gzcbl_desc }, 'oobx008Get: 查询期别语言描述');
     const gzcblResult = await externalDB.query(sql_gzcbl_desc);
     const gzcblRows = gzcblResult.rows as Record<string, unknown>[];
@@ -458,7 +520,12 @@ async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schem
 
     if (oobc004 === '8') {
         // 员工类型控制组 v_ooag001
-        const sql_ooag_count = `SELECT COUNT(*) AS cnt FROM ${schemaTo}.ooag_t WHERE ooagent = '${entTo}' AND ooag001 = '${oobc003}'`;
+        const sql_ooag_count = `
+            SELECT COUNT(*) AS cnt
+            FROM ${schemaTo}.ooag_t
+            WHERE ooagent = '${entTo}'
+              AND ooag001 = '${oobc003}'
+            `;
         logger.debug({ sql: sql_ooag_count }, 'oobc003Chk: 查询员工类型控制组');
         const countResult = await externalDB.query(sql_ooag_count);
         const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
@@ -468,7 +535,12 @@ async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schem
         }
     } else if (oobc004 === '7'){
         // 部门类型控制组 v_ooeg001
-        const sql_ooeg_count = `SELECT COUNT(*) AS cnt FROM ${schemaTo}.ooeg_t WHERE ooeg001 = '${oobc003}' AND ooegent = '${entTo}'`;
+        const sql_ooeg_count = `
+            SELECT COUNT(*) AS cnt
+            FROM ${schemaTo}.ooeg_t
+            WHERE ooeg001 = '${oobc003}'
+              AND ooegent = '${entTo}'
+            `;
         logger.debug({ sql: sql_ooeg_count }, 'oobc003Chk: 查询部门类型控制组');
         const countResult = await externalDB.query(sql_ooeg_count);
         const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
@@ -478,7 +550,13 @@ async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schem
         }
     } else{
         //  一般控制组 v_ooha001_5
-        const sql_ooha_count = `SELECT COUNT(*) AS cnt FROM ${schemaTo}.ooha_t WHERE oohaent = '${entTo}' AND ooha001 = '${oobc003}' AND ooha002 = '${oobc004}'`;
+        const sql_ooha_count = `
+            SELECT COUNT(*) AS cnt
+            FROM ${schemaTo}.ooha_t
+            WHERE oohaent = '${entTo}'
+              AND ooha001 = '${oobc003}'
+              AND ooha002 = '${oobc004}'
+            `;
         logger.debug({ sql: sql_ooha_count }, 'oobc003Chk: 查询一般类型控制组');
         const countResult = await externalDB.query(sql_ooha_count);
         const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
@@ -569,6 +647,7 @@ async function ooba002Chk(ooba002: string, entTo: string, schemaTo: string): Pro
 }
 
 /** 
+ * 校验字段编号是否存在于对应的单据别中
  * @param oobb004  字段编号
  * @param ooba002  单据别编号
  * @param entTo    集团代码
@@ -587,7 +666,7 @@ async function oobb004Chk(oobb004: string, ooba002: string, entTo: string, schem
     const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ oobb004, ooba002 }, 'oobb004Chk: 字段编号校验不通过');
-        return { table: 'oobb_t', field: 'oobb004', label: '字段编号', value: oobb004, message: `[oobb_t] 字段编号 [${oobb004}] 对应的作业程序在字段默认值关联视图(v_dzeb001_2)中校验不通过` };
+        return { table: 'oobb_t', field: 'oobb004', label: '字段编号', value: oobb004, message: `[oobb_t] 字段编号 [${oobb004}] 不存在于单据别 [${ooba002}]` };
     }
     logger.debug({ oobb004 }, 'oobb004Chk: 校验通过');
     return null;
@@ -694,14 +773,52 @@ async function oobi003Chk(ooba002: string, oobi003: string, entTo: string, schem
 }
 
 /**
+ * 重新计算oobx_t一行数据的相关编码字段
+ * @param oobxOld   oobx_t单行原始查询数据
+ * @param entTo     目标集团
+ * @param schemaTo  目标集团 Schema
+ * @param dlang     语言别
+ * @param oobx006   期别码（可选，不传则保持原值）
+*/
+async function recalculateAooi199Row(oobxOld: Oobx, entTo: string, schemaTo: string, dlang: string, oobx006?: string) {
+    const oobxNew = { ...oobxOld };
+
+    if ((oobx006 !== undefined) && (oobx006 !== '')) {
+        oobxNew.oobx006 = oobx006;
+    }
+
+    const oobx007Str = await oobx007Get(
+        oobxNew.oobx001,
+        oobxNew.oobx006 ?? '6', // 默认6.YYMMDD
+        dlang,
+        entTo,
+        schemaTo
+    );
+    oobxNew.oobx007 = Number(oobx007Str);
+
+    oobxNew.oobx008 = await oobx008Get(
+        oobxNew.oobx001,
+        oobxNew.oobx005 ?? 'Y', // 默认字段编码
+        oobxNew.oobx006 ?? '6', // 默认6.YYMMDD
+        oobx007Str,
+        dlang,
+        entTo,
+        schemaTo
+    );
+
+    return oobxNew;
+}
+
+
+/**
  * validateAooi199：校验 oobx_t 单据别字段
  * @param entFrom  来源集团代码
  * @param entTo    目标集团代码
  * @param dlang    当前语言
  * @param mode     校验模式：collect-收集所有错误 | failFast-遇错即停
 */
-export async function validateAooi199(entFrom: string, entTo: string, dlang: string, mode: ValidateMode = 'failFast'): Promise<ValidateError[]> {
-    logger.info({ entFrom, entTo, dlang, mode }, 'validateAooi199: 开始校验单据别字段');
+export async function validateAooi199(entFrom: string, entTo: string, dlang: string, mode: ValidateMode = 'failFast', oobx006?: string, recalculate?: boolean): Promise<ValidateError[]> {
+    logger.info({ entFrom, entTo, dlang, mode, oobx006, recalculate }, 'validateAooi199: 开始校验单据别字段');
     const errors: ValidateError[] = [];
 
     const schemaMap = await resolveSchemaMap();
@@ -711,17 +828,24 @@ export async function validateAooi199(entFrom: string, entTo: string, dlang: str
 
     // oobx_t: 直接遍历，校验单据别字段
     logger.debug('validateAooi199: 校验 oobx_t 单据别字段');
-    const sql_oobx_all = `SELECT * FROM ${schemaFrom}.oobx_t WHERE oobxent = '${entFrom}'`;
+    const sql_oobx_all = `
+        SELECT *
+        FROM ${schemaFrom}.oobx_t
+        WHERE oobxent = '${entFrom}'
+        ORDER BY oobxent, oobx001
+        `;
     logger.debug({ sql: sql_oobx_all }, 'validateAooi199: 查询 oobx_t');
     const oobxResult = await externalDB.query(sql_oobx_all);
     logger.debug({ rowCount: oobxResult.rows?.length }, 'validateAooi199: oobx_t 查询行数');
     for (const row of oobxResult.rows as Oobx[]) {
-        if (pushError(errors, await oobx001Chk(row.oobx001, entTo, schemaTo), mode)) return errors;
-        if (pushError(errors, await oobx002Chk(row.oobx002 ?? '', schemaTo), mode)) return errors;
-        if (pushError(errors, await oobx003Chk(row.oobx003 ?? '', schemaTo), mode)) return errors;
-        if (pushError(errors, await oobx004Chk(row.oobx004 ?? '', row.oobx003 ?? '', schemaTo), mode)) return errors;
-        if (pushError(errors, await oobx007Chk(row.oobx007, row.oobx001, row.oobx006 ?? '', dlang, entTo, schemaTo), mode)) return errors;
-        if (pushError(errors, await oobx008Chk(row.oobx008, row.oobx001, row.oobx005 ?? '', row.oobx006 ?? '', String(row.oobx007 ?? ''), dlang, entTo, schemaTo), mode)) return errors;
+        // 如果开启重新计算，则先根据目标集团参数重新计算编码字段
+        const recalculatedRow = recalculate ? await recalculateAooi199Row(row, entTo, schemaTo, dlang, oobx006) : row;
+        if (pushError(errors, await oobx001Chk(recalculatedRow.oobx001, entTo, schemaTo), mode)) return errors;
+        if (pushError(errors, await oobx002Chk(recalculatedRow.oobx002 ?? '', recalculatedRow.oobx001, schemaTo), mode)) return errors;
+        if (pushError(errors, await oobx003Chk(recalculatedRow.oobx003 ?? '', recalculatedRow.oobx001, schemaTo), mode)) return errors;
+        if (pushError(errors, await oobx004Chk(recalculatedRow.oobx004 ?? '', recalculatedRow.oobx003 ?? '', recalculatedRow.oobx001, schemaTo), mode)) return errors;
+        if (pushError(errors, await oobx007Chk(recalculatedRow.oobx007, recalculatedRow.oobx001, recalculatedRow.oobx006 ?? '', dlang, entTo, schemaTo), mode)) return errors;
+        if (pushError(errors, await oobx008Chk(recalculatedRow.oobx008, recalculatedRow.oobx001, recalculatedRow.oobx005 ?? '', recalculatedRow.oobx006 ?? '', String(recalculatedRow.oobx007 ?? ''), dlang, entTo, schemaTo), mode)) return errors;
     }
 
     if (errors.length > 0) {
@@ -752,7 +876,12 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // ooba_t: 直接遍历，校验参照表字段
     logger.debug('validateAooi200: 校验 ooba_t 参照表字段');
-    const sql_ooba_all = `SELECT * FROM ${schemaFrom}.ooba_t WHERE oobaent = '${entFrom}'`;
+    const sql_ooba_all = `
+        SELECT *
+        FROM ${schemaFrom}.ooba_t
+        WHERE oobaent = '${entFrom}'
+        ORDER BY oobaent, ooba001, ooba002
+        `;
     logger.debug({ sql: sql_ooba_all }, 'validateAooi200: 查询 ooba_t');
     const oobaResult = await externalDB.query(sql_ooba_all);
     logger.debug({ rowCount: oobaResult.rows?.length }, 'validateAooi200: ooba_t 查询行数');
@@ -763,7 +892,13 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // oobb_t JOIN ooba_t: 校验字段编号
     logger.debug('validateAooi200: 校验 oobb_t 字段编号');
-    const sql_oobb_join = `SELECT * FROM ${schemaFrom}.oobb_t LEFT JOIN ${schemaFrom}.ooba_t ON oobb001 = ooba001 AND oobb002 = ooba002 AND oobbent = oobaent WHERE oobbent = '${entFrom}' AND ooba001 = '${ooba001}'`;
+    const sql_oobb_join = `
+        SELECT *
+        FROM ${schemaFrom}.oobb_t
+        LEFT JOIN ${schemaFrom}.ooba_t ON oobb001 = ooba001 AND oobb002 = ooba002 AND oobbent = oobaent
+        WHERE oobbent = '${entFrom}'
+          AND ooba001 = '${ooba001}'
+        `;
     logger.debug({ sql: sql_oobb_join }, 'validateAooi200:查询 oobb_t');
     const oobbResult = await externalDB.query(sql_oobb_join);
     logger.debug({ rowCount: oobbResult.rows?.length }, 'validateAooi200:oobb_t 查询行数');
@@ -773,7 +908,13 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // oobc_t JOIN ooba_t: 校验控制组
     logger.debug('validateAooi200:校验 oobc_t 控制组');
-    const sql_oobc_join = `SELECT * FROM ${schemaFrom}.oobc_t LEFT JOIN ${schemaFrom}.ooba_t ON oobc001 = ooba001 AND oobc002 = ooba002 AND oobcent = oobaent WHERE oobcent = '${entFrom}' AND ooba001 = '${ooba001}'`;
+    const sql_oobc_join = `
+        SELECT *
+        FROM ${schemaFrom}.oobc_t
+        LEFT JOIN ${schemaFrom}.ooba_t ON oobc001 = ooba001 AND oobc002 = ooba002 AND oobcent = oobaent
+        WHERE oobcent = '${entFrom}'
+          AND ooba001 = '${ooba001}'
+        `;
     logger.debug({ sql: sql_oobc_join }, 'validateAooi200:查询 oobc_t');
     const oobcResult = await externalDB.query(sql_oobc_join);
     logger.debug({ rowCount: oobcResult.rows?.length }, 'validateAooi200:oobc_t 查询行数');
@@ -783,7 +924,13 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // oobd_t JOIN ooba_t: 校验生命周期
     logger.debug('validateAooi200:校验 oobd_t 生命周期');
-    const sql_oobd_join = `SELECT * FROM ${schemaFrom}.oobd_t LEFT JOIN ${schemaFrom}.ooba_t ON oobd001 = ooba001 AND oobd002 = ooba002 AND oobdent = oobaent WHERE oobdent = '${entFrom}' AND ooba001 = '${ooba001}'`;
+    const sql_oobd_join = `
+        SELECT *
+        FROM ${schemaFrom}.oobd_t
+        LEFT JOIN ${schemaFrom}.ooba_t ON oobd001 = ooba001 AND oobd002 = ooba002 AND oobdent = oobaent
+        WHERE oobdent = '${entFrom}'
+          AND ooba001 = '${ooba001}'
+        `;
     logger.debug({ sql: sql_oobd_join }, 'validateAooi200:查询 oobd_t');
     const oobdResult = await externalDB.query(sql_oobd_join);
     logger.debug({ rowCount: oobdResult.rows?.length }, 'validateAooi200:oobd_t 查询行数');
@@ -793,7 +940,13 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // oobh_t JOIN ooba_t: 校验产品分类
     logger.debug('validateAooi200:校验 oobh_t 产品分类');
-    const sql_oobh_join = `SELECT * FROM ${schemaFrom}.oobh_t LEFT JOIN ${schemaFrom}.ooba_t ON oobh001 = ooba001 AND oobh002 = ooba002 AND oobhent = oobaent WHERE oobhent = '${entFrom}' AND ooba001 = '${ooba001}'`;
+    const sql_oobh_join = `
+        SELECT *
+        FROM ${schemaFrom}.oobh_t
+        LEFT JOIN ${schemaFrom}.ooba_t ON oobh001 = ooba001 AND oobh002 = ooba002 AND oobhent = oobaent
+        WHERE oobhent = '${entFrom}'
+          AND ooba001 = '${ooba001}'
+        `;
     logger.debug({ sql: sql_oobh_join }, 'validateAooi200:查询 oobh_t');
     const oobhResult = await externalDB.query(sql_oobh_join);
     logger.debug({ rowCount: oobhResult.rows?.length }, 'validateAooi200:oobh_t 查询行数');
@@ -803,7 +956,13 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // oobi_t JOIN ooba_t: 校验单身理由码
     logger.debug('validateAooi200:校验 oobi_t 单身理由码');
-    const sql_oobi_join = `SELECT * FROM ${schemaFrom}.oobi_t LEFT JOIN ${schemaFrom}.ooba_t ON oobi001 = ooba001 AND oobi002 = ooba002 AND oobient = oobaent WHERE oobient = '${entFrom}' AND ooba001 = '${ooba001}'`;
+    const sql_oobi_join = `
+        SELECT *
+        FROM ${schemaFrom}.oobi_t
+        LEFT JOIN ${schemaFrom}.ooba_t ON oobi001 = ooba001 AND oobi002 = ooba002 AND oobient = oobaent
+        WHERE oobient = '${entFrom}'
+          AND ooba001 = '${ooba001}'
+        `;
     logger.debug({ sql: sql_oobi_join }, 'validateAooi200:查询 oobi_t');
     const oobiResult = await externalDB.query(sql_oobi_join);
     logger.debug({ rowCount: oobiResult.rows?.length }, 'validateAooi200:oobi_t 查询行数');
@@ -813,7 +972,13 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // oobj_t JOIN ooba_t: 校验库存标签F
     logger.debug('validateAooi200:校验 oobj_t 库存标签F');
-    const sql_oobj_join = `SELECT * FROM ${schemaFrom}.oobj_t LEFT JOIN ${schemaFrom}.ooba_t ON oobj001 = ooba001 AND oobj002 = ooba002 AND oobjent = oobaent WHERE oobjent = '${entFrom}' AND ooba001 = '${ooba001}'`;
+    const sql_oobj_join = `
+        SELECT *
+        FROM ${schemaFrom}.oobj_t
+        LEFT JOIN ${schemaFrom}.ooba_t ON oobj001 = ooba001 AND oobj002 = ooba002 AND oobjent = oobaent
+        WHERE oobjent = '${entFrom}'
+          AND ooba001 = '${ooba001}'
+        `;
     logger.debug({ sql: sql_oobj_join }, 'validateAooi200:查询 oobj_t');
     const oobjResult = await externalDB.query(sql_oobj_join);
     logger.debug({ rowCount: oobjResult.rows?.length }, 'validateAooi200:oobj_t 查询行数');
@@ -823,7 +988,13 @@ export async function validateAooi200(entFrom: string, entTo: string, dlang: str
 
     // oobk_t JOIN ooba_t: 校验库存标签T
     logger.debug('validateAooi200:校验 oobk_t 库存标签T');
-    const sql_oobk_join = `SELECT * FROM ${schemaFrom}.oobk_t LEFT JOIN ${schemaFrom}.ooba_t ON oobk001 = ooba001 AND oobk002 = ooba002 AND oobkent = oobaent WHERE oobkent = '${entFrom}' AND ooba001 = '${ooba001}'`;
+    const sql_oobk_join = `
+        SELECT *
+        FROM ${schemaFrom}.oobk_t
+        LEFT JOIN ${schemaFrom}.ooba_t ON oobk001 = ooba001 AND oobk002 = ooba002 AND oobkent = oobaent
+        WHERE oobkent = '${entFrom}'
+          AND ooba001 = '${ooba001}'
+        `;
     logger.debug({ sql: sql_oobk_join }, 'validateAooi200:查询 oobk_t');
     const oobkResult = await externalDB.query(sql_oobk_join);
     logger.debug({ rowCount: oobkResult.rows?.length }, 'validateAooi200:oobk_t 查询行数');
@@ -860,7 +1031,12 @@ export class SyncAooi200Service {
         await this.ensureConnected();
 
         try {
-            const result = await externalDB.query('SELECT gzou001 FROM gzou_t');
+            const sql_getEntList = `
+                SELECT gzou001
+                FROM gzou_t
+                `;
+            logger.debug({ sql: sql_getEntList }, '[SyncAooi200Service] 查询ENT列表');
+            const result = await externalDB.query(sql_getEntList);
             const rows = result.rows as Record<string, unknown>[];
             return rows.map(row => Number(row.gzou001)).filter(n => !isNaN(n));
         } catch (error) {
@@ -879,7 +1055,14 @@ export class SyncAooi200Service {
         try {
             const schemaMap = await resolveSchemaMap();
             const schema = schemaMap[String(ent)] || String(ent);
-            const result = await externalDB.query(`SELECT ooal002 FROM ${schema}.ooal_t WHERE ooal001 = 3 AND ooalent = ${ent}`);
+            const sql_getOoba001List = `
+                SELECT ooal002
+                FROM ${schema}.ooal_t
+                WHERE ooal001 = 3
+                  AND ooalent = ${ent}
+                `;
+            logger.debug({ sql: sql_getOoba001List }, '[SyncAooi200Service] 查询参照表编号列表');
+            const result = await externalDB.query(sql_getOoba001List);
             const rows = result.rows as Record<string, unknown>[];
             return rows.map(row => String(row.ooal002));
         } catch (error) {
@@ -918,18 +1101,29 @@ export class SyncAooi200Service {
     }
 
     /**
+     * 获取系统分类码选项（SCC）
+     * @param scc 系统分类码编号，如 14=单据期别编码
+     */
+    public async getSccOptions(scc: string): Promise<Record<string, string>[]> {
+        await this.ensureConnected();
+        return queryScc(scc);
+    }
+
+    /**
      * 执行 Aooi199 校验（单据别字段校验）
      */
     public async runValidateAooi199(
         entFrom: string,
         entTo: string,
         dlang: string,
-        mode: ValidateMode = 'failFast'
+        mode: ValidateMode = 'failFast',
+        oobx006?: string,
+        recalculate?: boolean,
     ): Promise<Aooi200ValidateResult> {
         await this.ensureConnected();
 
         try {
-            const errors = await validateAooi199(entFrom, entTo, dlang, mode);
+            const errors = await validateAooi199(entFrom, entTo, dlang, mode, oobx006, recalculate);
             const success = errors.length === 0;
             const message = success
                 ? 'Aooi199 全部校验通过'

@@ -96,7 +96,8 @@ interface ElectronAPI {
   getAooi200EntList: () => Promise<{ success: boolean; entList: number[]; error?: string }>
   getAooi200Ooba001List: (ent: number) => Promise<{ success: boolean; ooba001List: string[]; error?: string }>
   aooi200EcomCheck: (entFrom: string, entTo: string) => Promise<Aooi200ValidateResult>
-  aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string) => Promise<Aooi200ValidateResult>
+  getAooi200SccOptions: (scc: string) => Promise<{ success: boolean; rows: Record<string, string>[]; error?: string }>
+  aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => Promise<Aooi200ValidateResult>
   aooi200ValidateAooi200: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => Promise<Aooi200ValidateResult>
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>

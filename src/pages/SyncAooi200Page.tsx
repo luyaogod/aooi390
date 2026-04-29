@@ -58,6 +58,9 @@ function SyncAooi200Page() {
   const [aooi199Loading, setAooi199Loading] = useState(false)
   const [aooi199Result, setAooi199Result] = useState<Aooi200ValidateResult | null>(null)
   const [aooi199Skipped, setAooi199Skipped] = useState(false)
+  const [sccOptions, setSccOptions] = useState<Record<string, string>[]>([])
+  const [aooi199Oobx006, setAooi199Oobx006] = useState('')
+  const [aooi199Recalculate, setAooi199Recalculate] = useState(false)
 
   // === 卡片3：校验 Aooi200 ===
   const [ooba001List, setOoba001List] = useState<string[]>([])
@@ -95,6 +98,17 @@ function SyncAooi200Page() {
     }
   }
 
+  const fetchSccOptions = async (): Promise<void> => {
+    try {
+      const result = await window.electronAPI.getAooi200SccOptions('14')
+      if (result.success) {
+        setSccOptions(result.rows)
+      }
+    } catch (err) {
+      console.error('获取期别码选项失败:', err)
+    }
+  }
+
   // === 卡片1：检查设置 ===
   const handleEcomCheck = async () => {
     if (!ecomSourceEnt || !ecomTargetEnt) return
@@ -129,7 +143,7 @@ function SyncAooi200Page() {
     setAooi199Result(null)
     setAooi200Result(null)
     try {
-      const result = await window.electronAPI.aooi200ValidateAooi199(ecomSourceEnt, ecomTargetEnt, dlang, aooi199Mode)
+      const result = await window.electronAPI.aooi200ValidateAooi199(ecomSourceEnt, ecomTargetEnt, dlang, aooi199Mode, aooi199Recalculate ? aooi199Oobx006 : undefined, aooi199Recalculate || undefined)
       setAooi199Result(result)
     } catch (err) {
       setAooi199Result({
@@ -175,6 +189,13 @@ function SyncAooi200Page() {
   const ecomEntDuplicate = ecomSourceEnt !== '' && ecomTargetEnt !== '' && ecomSourceEnt === ecomTargetEnt
   const canEcomCheck = ecomSourceEnt !== '' && ecomTargetEnt !== '' && !ecomEntDuplicate
   const ecomPassed = ecomCheckResult?.success === true || ecomSkipped
+
+  useEffect(() => {
+    if (ecomPassed) {
+      fetchSccOptions()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ecomPassed])
 
   const canAooi199 = dlang !== '' && !ecomEntDuplicate
   const aooi199Passed = aooi199Result?.success === true || aooi199Skipped
@@ -398,6 +419,48 @@ function SyncAooi200Page() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
+              </Field>
+
+              <Field label="期别码（SCC=14）">
+                <Select
+                  value={aooi199Oobx006}
+                  onValueChange={(value) => {
+                    setAooi199Oobx006(value)
+                    if (value) setAooi199Recalculate(true)
+                    setAooi199Result(null)
+                  }}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue placeholder="不指定（使用原值）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {sccOptions.map((opt) => (
+                        <SelectItem key={opt.gzcb002} value={opt.gzcb002}>
+                          {opt.gzcb002} - {opt.gzcbl004}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <Field label="重新计算编码否">
+                <div className="flex items-center gap-2 h-9">
+                  <input
+                    type="checkbox"
+                    id="aooi199-recalculate"
+                    checked={aooi199Recalculate}
+                    onChange={(e) => {
+                      setAooi199Recalculate(e.target.checked)
+                      setAooi199Result(null)
+                    }}
+                    className="size-4 rounded border-gray-300 accent-primary cursor-pointer"
+                  />
+                  <label htmlFor="aooi199-recalculate" className="text-sm cursor-pointer select-none">
+                    根据目标集团参数重新计算 oobx007/oobx008
+                  </label>
+                </div>
               </Field>
             </div>
 
