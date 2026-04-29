@@ -260,9 +260,12 @@ ipcMain.handle('aooi200:get-scc-options', async (_event, scc: string) => {
 })
 
 // IPC: 执行Aooi199校验（单据别字段校验）
-ipcMain.handle('aooi200:validate-aooi199', async (_event, entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => {
+ipcMain.handle('aooi200:validate-aooi199', async (event, entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => {
   try {
-    const result = await syncAooi200Service.runValidateAooi199(entFrom, entTo, dlang, mode as 'collect' | 'failFast', oobx006, recalculate)
+    const onProgress = (current: number, total: number) => {
+      event.sender.send('aooi200:validation-progress', { current, total })
+    }
+    const result = await syncAooi200Service.runValidateAooi199(entFrom, entTo, dlang, mode as 'collect' | 'failFast', oobx006, recalculate, onProgress)
     return result
   } catch (error) {
     logger.error(error, '[Main] Aooi199校验失败')
@@ -275,9 +278,12 @@ ipcMain.handle('aooi200:validate-aooi199', async (_event, entFrom: string, entTo
 })
 
 // IPC: 执行Aooi200校验
-ipcMain.handle('aooi200:validate-aooi200', async (_event, entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => {
+ipcMain.handle('aooi200:validate-aooi200', async (event, entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => {
   try {
-    const result = await syncAooi200Service.runValidateAooi200(entFrom, entTo, dlang, ooba001, mode as 'collect' | 'failFast')
+    const onProgress = (current: number, total: number) => {
+      event.sender.send('aooi200:validation-progress', { current, total })
+    }
+    const result = await syncAooi200Service.runValidateAooi200(entFrom, entTo, dlang, ooba001, mode as 'collect' | 'failFast', onProgress)
     return result
   } catch (error) {
     logger.error(error, '[Main] Aooi200校验失败')

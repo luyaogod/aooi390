@@ -24,6 +24,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAooi200SccOptions: (scc: string) => ipcRenderer.invoke('aooi200:get-scc-options', scc),
   aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => ipcRenderer.invoke('aooi200:validate-aooi199', entFrom, entTo, dlang, mode, oobx006, recalculate),
   aooi200ValidateAooi200: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => ipcRenderer.invoke('aooi200:validate-aooi200', entFrom, entTo, dlang, ooba001, mode),
+  onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
+    ipcRenderer.on('aooi200:validation-progress', listener)
+    return () => { ipcRenderer.removeListener('aooi200:validation-progress', listener) }
+  },
 
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => ipcRenderer.invoke('param-diff:enterprise-params', ent, dlang),

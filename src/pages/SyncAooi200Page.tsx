@@ -69,6 +69,7 @@ function SyncAooi200Page() {
   const [aooi200Mode, setAooi200Mode] = useState<'collect' | 'failFast'>('failFast')
   const [aooi200Loading, setAooi200Loading] = useState(false)
   const [aooi200Result, setAooi200Result] = useState<Aooi200ValidateResult | null>(null)
+  const [validationProgress, setValidationProgress] = useState<{ current: number; total: number } | null>(null)
 
   const fetchEntList = async (): Promise<void> => {
     setEntListLoading(true)
@@ -142,6 +143,10 @@ function SyncAooi200Page() {
     setAooi199Loading(true)
     setAooi199Result(null)
     setAooi200Result(null)
+    setValidationProgress({ current: 0, total: 0 })
+    const unsub = window.electronAPI.onAooi200ValidationProgress((data) => {
+      setValidationProgress(data)
+    })
     try {
       const result = await window.electronAPI.aooi200ValidateAooi199(ecomSourceEnt, ecomTargetEnt, dlang, aooi199Mode, aooi199Recalculate ? aooi199Oobx006 : undefined, aooi199Recalculate || undefined)
       setAooi199Result(result)
@@ -153,6 +158,8 @@ function SyncAooi200Page() {
       })
     } finally {
       setAooi199Loading(false)
+      unsub()
+      setValidationProgress(null)
     }
   }
 
@@ -162,6 +169,10 @@ function SyncAooi200Page() {
 
     setAooi200Loading(true)
     setAooi200Result(null)
+    setValidationProgress({ current: 0, total: 0 })
+    const unsub = window.electronAPI.onAooi200ValidationProgress((data) => {
+      setValidationProgress(data)
+    })
     try {
       const result = await window.electronAPI.aooi200ValidateAooi200(ecomSourceEnt, ecomTargetEnt, dlang, ooba001, aooi200Mode)
       setAooi200Result(result)
@@ -173,6 +184,8 @@ function SyncAooi200Page() {
       })
     } finally {
       setAooi200Loading(false)
+      unsub()
+      setValidationProgress(null)
     }
   }
 
@@ -514,7 +527,10 @@ function SyncAooi200Page() {
                 ? <Loader2 className="size-3.5 animate-spin" />
                 : <Play className="size-3.5" />
               }
-              {aooi199Loading ? '校验中...' : '执行校验'}
+              {aooi199Loading
+                ? validationProgress ? `校验中... ${validationProgress.current}/${validationProgress.total}` : '校验中...'
+                : '执行校验'
+              }
             </Button>
 
             {aooi199Result && !aooi199Result.success && (
@@ -671,7 +687,10 @@ function SyncAooi200Page() {
                 ? <Loader2 className="size-3.5 animate-spin" />
                 : <Play className="size-3.5" />
               }
-              {aooi200Loading ? '校验中...' : '执行校验'}
+              {aooi200Loading
+                ? validationProgress ? `校验中... ${validationProgress.current}/${validationProgress.total}` : '校验中...'
+                : '执行校验'
+              }
             </Button>
           </CardFooter>
         </Card>
