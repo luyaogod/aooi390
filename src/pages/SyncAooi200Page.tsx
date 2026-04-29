@@ -45,22 +45,27 @@ function SyncAooi200Page() {
   const [entList, setEntList] = useState<number[]>([])
   const [entListLoading, setEntListLoading] = useState(true)
 
-  // === 企业单据参数设置检查 ===
+  // === 卡片1：检查设置（E-COM 参数检查） ===
   const [ecomSourceEnt, setEcomSourceEnt] = useState('')
   const [ecomTargetEnt, setEcomTargetEnt] = useState('')
   const [ecomCheckLoading, setEcomCheckLoading] = useState(false)
   const [ecomCheckResult, setEcomCheckResult] = useState<Aooi200ValidateResult | null>(null)
   const [ecomSkipped, setEcomSkipped] = useState(false)
 
-  // === 单据别校验 ===
+  // === 卡片2：校验 Aooi199（单据别字段校验） ===
+  const [dlang, setDlang] = useState('zh_CN')
+  const [aooi199Mode, setAooi199Mode] = useState<'collect' | 'failFast'>('failFast')
+  const [aooi199Loading, setAooi199Loading] = useState(false)
+  const [aooi199Result, setAooi199Result] = useState<Aooi200ValidateResult | null>(null)
+  const [aooi199Skipped, setAooi199Skipped] = useState(false)
+
+  // === 卡片3：校验 Aooi200 ===
   const [ooba001List, setOoba001List] = useState<string[]>([])
   const [ooba001ListLoading, setOoba001ListLoading] = useState(false)
-  const [dlang, setDlang] = useState('zh_CN')
   const [ooba001, setOoba001] = useState('')
-  const [mode, setMode] = useState<'collect' | 'failFast'>('collect')
-
-  const [validateLoading, setValidateLoading] = useState(false)
-  const [validateResult, setValidateResult] = useState<Aooi200ValidateResult | null>(null)
+  const [aooi200Mode, setAooi200Mode] = useState<'collect' | 'failFast'>('failFast')
+  const [aooi200Loading, setAooi200Loading] = useState(false)
+  const [aooi200Result, setAooi200Result] = useState<Aooi200ValidateResult | null>(null)
 
   const fetchEntList = async (): Promise<void> => {
     setEntListLoading(true)
@@ -90,7 +95,7 @@ function SyncAooi200Page() {
     }
   }
 
-  // === 企业单据参数设置检查 ===
+  // === 卡片1：检查设置 ===
   const handleEcomCheck = async () => {
     if (!ecomSourceEnt || !ecomTargetEnt) return
     if (ecomSourceEnt === ecomTargetEnt) {
@@ -100,9 +105,8 @@ function SyncAooi200Page() {
 
     setEcomCheckLoading(true)
     setEcomCheckResult(null)
-    // 重置下游校验状态
-    setValidateResult(null)
-    setOoba001('')
+    setAooi199Result(null)
+    setAooi200Result(null)
     try {
       const result = await window.electronAPI.aooi200EcomCheck(ecomSourceEnt, ecomTargetEnt)
       setEcomCheckResult(result)
@@ -117,23 +121,44 @@ function SyncAooi200Page() {
     }
   }
 
-  // === 单据别校验 ===
-  const handleValidate = async () => {
-    if (!ecomSourceEnt || !ecomTargetEnt || !dlang || !ooba001) return
+  // === 卡片2：校验 Aooi199 ===
+  const handleAooi199 = async () => {
+    if (!ecomSourceEnt || !ecomTargetEnt || !dlang) return
 
-    setValidateLoading(true)
-    setValidateResult(null)
+    setAooi199Loading(true)
+    setAooi199Result(null)
+    setAooi200Result(null)
     try {
-      const result = await window.electronAPI.aooi200Validate(ecomSourceEnt, ecomTargetEnt, dlang, ooba001, mode)
-      setValidateResult(result)
+      const result = await window.electronAPI.aooi200ValidateAooi199(ecomSourceEnt, ecomTargetEnt, dlang, aooi199Mode)
+      setAooi199Result(result)
     } catch (err) {
-      setValidateResult({
+      setAooi199Result({
         success: false,
         errors: [],
         message: err instanceof Error ? err.message : String(err),
       })
     } finally {
-      setValidateLoading(false)
+      setAooi199Loading(false)
+    }
+  }
+
+  // === 卡片3：校验 Aooi200 ===
+  const handleAooi200 = async () => {
+    if (!ecomSourceEnt || !ecomTargetEnt || !dlang || !ooba001) return
+
+    setAooi200Loading(true)
+    setAooi200Result(null)
+    try {
+      const result = await window.electronAPI.aooi200ValidateAooi200(ecomSourceEnt, ecomTargetEnt, dlang, ooba001, aooi200Mode)
+      setAooi200Result(result)
+    } catch (err) {
+      setAooi200Result({
+        success: false,
+        errors: [],
+        message: err instanceof Error ? err.message : String(err),
+      })
+    } finally {
+      setAooi200Loading(false)
     }
   }
 
@@ -151,15 +176,18 @@ function SyncAooi200Page() {
   const canEcomCheck = ecomSourceEnt !== '' && ecomTargetEnt !== '' && !ecomEntDuplicate
   const ecomPassed = ecomCheckResult?.success === true || ecomSkipped
 
-  const canValidate = dlang !== '' && ooba001 !== '' && !ecomEntDuplicate
+  const canAooi199 = dlang !== '' && !ecomEntDuplicate
+  const aooi199Passed = aooi199Result?.success === true || aooi199Skipped
+
+  const canAooi200 = dlang !== '' && ooba001 !== '' && !ecomEntDuplicate
 
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
-      {/* 企业单据参数设置检查卡片 */}
+      {/* 卡片1：检查设置 —— 企业单据参数设置检查 */}
       <Card>
         <CardHeader>
-          <CardTitle>企业单据参数设置检查</CardTitle>
-          <CardDescription>检查来源集团与目标集团的 E-COM 参数是否一致，通过后方可进行单据别校验</CardDescription>
+          <CardTitle>检查设置</CardTitle>
+          <CardDescription>检查来源集团与目标集团的 E-COM 参数是否一致，通过后方可进行后续校验</CardDescription>
           {ecomCheckResult && (
             <CardAction>
               <Badge
@@ -188,8 +216,10 @@ function SyncAooi200Page() {
                   onValueChange={(value) => {
                     if (value) setEcomSourceEnt(value)
                     setEcomCheckResult(null)
-                    setValidateResult(null)
+                    setAooi199Result(null)
+                    setAooi200Result(null)
                     setEcomSkipped(false)
+                    setAooi199Skipped(false)
                   }}
                 >
                   <SelectTrigger className="w-60">
@@ -213,8 +243,10 @@ function SyncAooi200Page() {
                   onValueChange={(value) => {
                     if (value) setEcomTargetEnt(value)
                     setEcomCheckResult(null)
-                    setValidateResult(null)
+                    setAooi199Result(null)
+                    setAooi200Result(null)
                     setEcomSkipped(false)
+                    setAooi199Skipped(false)
                   }}
                 >
                   <SelectTrigger className="w-60">
@@ -309,12 +341,152 @@ function SyncAooi200Page() {
         </CardFooter>
       </Card>
 
-      {/* 单据别校验卡片 —— 仅在 E-COM 检查通过后显示 */}
+      {/* 卡片2：校验 Aooi199 —— 仅在卡片1通过后显示 */}
       {ecomPassed && (
         <Card>
           <CardHeader>
-            <CardTitle>单据别校验</CardTitle>
-            <CardDescription>校验来源集团与目标集团之间单据别数据的一致性</CardDescription>
+            <CardTitle>校验 Aooi199</CardTitle>
+            <CardDescription>校验来源集团单据别字段（oobx_t）在目标集团中的有效性</CardDescription>
+            {aooi199Result && (
+              <CardAction>
+                <Badge
+                  className={aooi199Result.success
+                    ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
+                    : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+                  }
+                >
+                  {aooi199Result.success ? '校验通过' : `存在 ${aooi199Result.errors.length} 项错误`}
+                </Badge>
+              </CardAction>
+            )}
+          </CardHeader>
+
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4">
+              <Field label="来源集团">
+                <span className="font-medium text-sm">{ecomSourceEnt}</span>
+              </Field>
+
+              <Field label="目标集团">
+                <span className="font-medium text-sm">{ecomTargetEnt}</span>
+              </Field>
+
+              <Field label="语言代码">
+                <Input
+                  value={dlang}
+                  onChange={(e) => {
+                    setDlang(e.target.value)
+                    setAooi199Result(null)
+                  }}
+                  placeholder="例如：zh_CN"
+                  className="w-60"
+                />
+              </Field>
+
+              <Field label="校验模式">
+                <Select
+                  value={aooi199Mode}
+                  onValueChange={(value) => setAooi199Mode(value as 'collect' | 'failFast')}
+                >
+                  <SelectTrigger className="w-60">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="collect">收集所有错误</SelectItem>
+                      <SelectItem value="failFast">遇错即停</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </Field>
+            </div>
+
+            {aooi199Result && (
+              <Alert variant={aooi199Result.success ? 'default' : 'destructive'}>
+                {aooi199Result.success ? (
+                  <CheckCircle2 className="size-4" />
+                ) : (
+                  <AlertTriangle className="size-4" />
+                )}
+                <AlertTitle>校验结果</AlertTitle>
+                <AlertDescription>{aooi199Result.message}</AlertDescription>
+              </Alert>
+            )}
+
+            {aooi199Result && aooi199Result.errors.length > 0 && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>表名</TableHead>
+                    <TableHead>字段</TableHead>
+                    <TableHead>中文名</TableHead>
+                    <TableHead>实际值</TableHead>
+                    <TableHead>错误描述</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {aooi199Result.errors.map((err, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell className="font-mono">{err.table}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{err.field}</TableCell>
+                      <TableCell>{err.label}</TableCell>
+                      <TableCell className="font-mono">{err.value}</TableCell>
+                      <TableCell className="text-sm">{err.message}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+
+          <CardFooter className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAooi199}
+              disabled={!canAooi199 || aooi199Loading}
+              className="gap-1.5"
+            >
+              {aooi199Loading
+                ? <Loader2 className="size-3.5 animate-spin" />
+                : <Play className="size-3.5" />
+              }
+              {aooi199Loading ? '校验中...' : '执行校验'}
+            </Button>
+
+            {aooi199Result && !aooi199Result.success && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAooi199Skipped(true)}
+                className="gap-1.5"
+              >
+                <Play className="size-3.5" />
+                跳过校验，继续
+              </Button>
+            )}
+          </CardFooter>
+        </Card>
+      )}
+
+      {/* 卡片3：校验 Aooi200 —— 仅在卡片2通过后显示 */}
+      {aooi199Passed && (
+        <Card>
+          <CardHeader>
+            <CardTitle>校验 Aooi200</CardTitle>
+            <CardDescription>校验参照表、控制组、生命周期、产品分类、库存标签等字段在目标集团中的有效性</CardDescription>
+            {aooi200Result && (
+              <CardAction>
+                <Badge
+                  className={aooi200Result.success
+                    ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
+                    : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+                  }
+                >
+                  {aooi200Result.success ? '校验通过' : `存在 ${aooi200Result.errors.length} 项错误`}
+                </Badge>
+              </CardAction>
+            )}
           </CardHeader>
 
           <CardContent className="flex flex-col gap-4">
@@ -339,7 +511,7 @@ function SyncAooi200Page() {
                     value={dlang}
                     onChange={(e) => {
                       setDlang(e.target.value)
-                      setValidateResult(null)
+                      setAooi200Result(null)
                     }}
                     placeholder="例如：zh_CN"
                     className="w-60"
@@ -351,7 +523,7 @@ function SyncAooi200Page() {
                     value={ooba001}
                     onValueChange={(value) => {
                       if (value) setOoba001(value)
-                      setValidateResult(null)
+                      setAooi200Result(null)
                     }}
                   >
                     <SelectTrigger className="w-60">
@@ -369,8 +541,8 @@ function SyncAooi200Page() {
 
                 <Field label="校验模式">
                   <Select
-                    value={mode}
-                    onValueChange={(value) => setMode(value as 'collect' | 'failFast')}
+                    value={aooi200Mode}
+                    onValueChange={(value) => setAooi200Mode(value as 'collect' | 'failFast')}
                   >
                     <SelectTrigger className="w-60">
                       <SelectValue />
@@ -385,58 +557,20 @@ function SyncAooi200Page() {
                 </Field>
               </div>
             )}
-          </CardContent>
 
-          <CardFooter>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleValidate}
-              disabled={!canValidate || validateLoading}
-              className="gap-1.5"
-            >
-              {validateLoading
-                ? <Loader2 className="size-3.5 animate-spin" />
-                : <Play className="size-3.5" />
-              }
-              {validateLoading ? '校验中...' : '执行校验'}
-            </Button>
-          </CardFooter>
-        </Card>
-      )}
+            {aooi200Result && (
+              <Alert variant={aooi200Result.success ? 'default' : 'destructive'}>
+                {aooi200Result.success ? (
+                  <CheckCircle2 className="size-4" />
+                ) : (
+                  <AlertTriangle className="size-4" />
+                )}
+                <AlertTitle>校验结果</AlertTitle>
+                <AlertDescription>{aooi200Result.message}</AlertDescription>
+              </Alert>
+            )}
 
-      {/* 校验结果卡片 */}
-      {validateResult && (
-        <Card>
-          <CardHeader>
-            <CardTitle>校验结果</CardTitle>
-            <CardDescription>
-              来源集团={ecomSourceEnt} → 目标集团={ecomTargetEnt}，参照表编号={ooba001}
-            </CardDescription>
-            <CardAction>
-              <Badge
-                className={validateResult.success
-                  ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
-                  : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
-                }
-              >
-                {validateResult.success ? '校验通过' : `存在 ${validateResult.errors.length} 项错误`}
-              </Badge>
-            </CardAction>
-          </CardHeader>
-
-          <CardContent className="flex flex-col gap-4">
-            <Alert variant={validateResult.success ? 'default' : 'destructive'}>
-              {validateResult.success ? (
-                <CheckCircle2 className="size-4" />
-              ) : (
-                <AlertTriangle className="size-4" />
-              )}
-              <AlertTitle>执行结果</AlertTitle>
-              <AlertDescription>{validateResult.message}</AlertDescription>
-            </Alert>
-
-            {validateResult.errors.length > 0 && (
+            {aooi200Result && aooi200Result.errors.length > 0 && (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -448,7 +582,7 @@ function SyncAooi200Page() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {validateResult.errors.map((err, idx) => (
+                  {aooi200Result.errors.map((err, idx) => (
                     <TableRow key={idx}>
                       <TableCell className="font-mono">{err.table}</TableCell>
                       <TableCell className="font-mono text-muted-foreground">{err.field}</TableCell>
@@ -466,10 +600,15 @@ function SyncAooi200Page() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setValidateResult(null)}
+              onClick={handleAooi200}
+              disabled={!canAooi200 || aooi200Loading}
               className="gap-1.5"
             >
-              重新校验
+              {aooi200Loading
+                ? <Loader2 className="size-3.5 animate-spin" />
+                : <Play className="size-3.5" />
+              }
+              {aooi200Loading ? '校验中...' : '执行校验'}
             </Button>
           </CardFooter>
         </Card>

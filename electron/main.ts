@@ -6,7 +6,7 @@ import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
-import { syncAooi200Service } from './core/sync-azzi200'
+import { syncAooi200Service } from './core/sync-aooi200'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
 
@@ -248,10 +248,25 @@ ipcMain.handle('aooi200:get-ooba001-list', async (_event, ent: number) => {
   }
 })
 
-// IPC: 执行Aooi200校验
-ipcMain.handle('aooi200:validate', async (_event, entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => {
+// IPC: 执行Aooi199校验（单据别字段校验）
+ipcMain.handle('aooi200:validate-aooi199', async (_event, entFrom: string, entTo: string, dlang: string, mode: string) => {
   try {
-    const result = await syncAooi200Service.runValidate(entFrom, entTo, dlang, ooba001, mode as 'collect' | 'failFast')
+    const result = await syncAooi200Service.runValidateAooi199(entFrom, entTo, dlang, mode as 'collect' | 'failFast')
+    return result
+  } catch (error) {
+    logger.error(error, '[Main] Aooi199校验失败')
+    return {
+      success: false,
+      errors: [],
+      message: error instanceof Error ? error.message : String(error),
+    }
+  }
+})
+
+// IPC: 执行Aooi200校验
+ipcMain.handle('aooi200:validate-aooi200', async (_event, entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => {
+  try {
+    const result = await syncAooi200Service.runValidateAooi200(entFrom, entTo, dlang, ooba001, mode as 'collect' | 'failFast')
     return result
   } catch (error) {
     logger.error(error, '[Main] Aooi200校验失败')

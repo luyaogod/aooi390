@@ -21,7 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAooi200EntList: () => ipcRenderer.invoke('aooi200:get-ent-list'),
   getAooi200Ooba001List: (ent: number) => ipcRenderer.invoke('aooi200:get-ooba001-list', ent),
   aooi200EcomCheck: (entFrom: string, entTo: string) => ipcRenderer.invoke('aooi200:ecom-check', entFrom, entTo),
-  aooi200Validate: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => ipcRenderer.invoke('aooi200:validate', entFrom, entTo, dlang, ooba001, mode),
+  aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string) => ipcRenderer.invoke('aooi200:validate-aooi199', entFrom, entTo, dlang, mode),
+  aooi200ValidateAooi200: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => ipcRenderer.invoke('aooi200:validate-aooi200', entFrom, entTo, dlang, ooba001, mode),
 
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => ipcRenderer.invoke('param-diff:enterprise-params', ent, dlang),
