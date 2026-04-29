@@ -147,7 +147,7 @@ function SyncAzzi001Page() {
           ) : (
             <div className="flex flex-col gap-4">
 
-              <Field label="源 ENT">
+              <Field label="来源 ENT">
                 <Select
                   value={sourceEnt}
                   onValueChange={(value) => {
@@ -158,7 +158,7 @@ function SyncAzzi001Page() {
                   }}
                 >
                   <SelectTrigger className="w-60">
-                    <SelectValue placeholder="选择源 ENT" />
+                    <SelectValue placeholder="选择来源 ENT" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>

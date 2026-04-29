@@ -35,8 +35,7 @@ import { Field } from '@/components/ui/field'
 import {
   Loader2,
   ArrowLeftRight,
-  Building2,
-  MapPin,
+  Play,
   Filter,
 } from 'lucide-react'
 
@@ -407,7 +406,7 @@ function ParamDiffPage() {
           >
             {entLoading
               ? <Loader2 className="size-3.5 animate-spin" />
-              : <Building2 className="size-3.5" />
+              : <Play className="size-3.5" />
             }
             {entLoading ? '对比中...' : '执行对比'}
           </Button>
@@ -530,7 +529,7 @@ function ParamDiffPage() {
           >
             {siteLoading
               ? <Loader2 className="size-3.5 animate-spin" />
-              : <MapPin className="size-3.5" />
+              : <Play className="size-3.5" />
             }
             {siteLoading ? '对比中...' : '执行对比'}
           </Button>

@@ -50,6 +50,7 @@ function SyncAooi200Page() {
   const [ecomTargetEnt, setEcomTargetEnt] = useState('')
   const [ecomCheckLoading, setEcomCheckLoading] = useState(false)
   const [ecomCheckResult, setEcomCheckResult] = useState<Aooi200ValidateResult | null>(null)
+  const [ecomSkipped, setEcomSkipped] = useState(false)
 
   // === 单据别校验 ===
   const [ooba001List, setOoba001List] = useState<string[]>([])
@@ -141,14 +142,14 @@ function SyncAooi200Page() {
   }, [])
 
   useEffect(() => {
-    if (ecomCheckResult?.success && ecomSourceEnt) {
+    if ((ecomCheckResult?.success || ecomSkipped) && ecomSourceEnt) {
       fetchOoba001List(Number(ecomSourceEnt))
     }
-  }, [ecomCheckResult?.success, ecomSourceEnt])
+  }, [ecomCheckResult?.success, ecomSkipped, ecomSourceEnt])
 
   const ecomEntDuplicate = ecomSourceEnt !== '' && ecomTargetEnt !== '' && ecomSourceEnt === ecomTargetEnt
   const canEcomCheck = ecomSourceEnt !== '' && ecomTargetEnt !== '' && !ecomEntDuplicate
-  const ecomPassed = ecomCheckResult?.success === true
+  const ecomPassed = ecomCheckResult?.success === true || ecomSkipped
 
   const canValidate = dlang !== '' && ooba001 !== '' && !ecomEntDuplicate
 
@@ -188,6 +189,7 @@ function SyncAooi200Page() {
                     if (value) setEcomSourceEnt(value)
                     setEcomCheckResult(null)
                     setValidateResult(null)
+                    setEcomSkipped(false)
                   }}
                 >
                   <SelectTrigger className="w-60">
@@ -212,6 +214,7 @@ function SyncAooi200Page() {
                     if (value) setEcomTargetEnt(value)
                     setEcomCheckResult(null)
                     setValidateResult(null)
+                    setEcomSkipped(false)
                   }}
                 >
                   <SelectTrigger className="w-60">
@@ -277,7 +280,7 @@ function SyncAooi200Page() {
           )}
         </CardContent>
 
-        <CardFooter>
+        <CardFooter className="gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -291,6 +294,18 @@ function SyncAooi200Page() {
             }
             {ecomCheckLoading ? '检查中...' : '执行检查'}
           </Button>
+
+          {ecomCheckResult && !ecomCheckResult.success && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEcomSkipped(true)}
+              className="gap-1.5"
+            >
+              <Play className="size-3.5" />
+              跳过检查，继续校验
+            </Button>
+          )}
         </CardFooter>
       </Card>
 
