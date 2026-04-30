@@ -105,6 +105,8 @@ interface ElectronAPI {
   aooi200ExportTemplate: () => Promise<{ success: boolean; canceled?: boolean; error?: string }>
   aooi200ImportTemplate: (mode: string, connectionName?: string) => Promise<{ success: boolean; canceled?: boolean; rows?: ImportRow[]; error?: string }>
   aooi200ExportResult: (rows: unknown[], ooba001?: string) => Promise<{ success: boolean; canceled?: boolean; error?: string }>
+  aooi200ExportConfig: () => Promise<{ success: boolean; canceled?: boolean; results?: { table: string; count: number }[]; error?: string }>
+  aooi200ImportConfig: () => Promise<{ success: boolean; canceled?: boolean; results?: { table: string; count: number }[]; error?: string }>
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>

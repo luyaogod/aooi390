@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import fs from 'node:fs/promises';
 import { externalDB, appDB } from '../db/clients';
 import logger from '../utils/logger';
 import { dbConnectionManager } from '../config/db-connections';
@@ -703,4 +704,92 @@ export async function exportAooi200Result2(
 
     await workbook.xlsx.writeFile(filePath);
     logger.info('[genAooi200] 多Sheet处理结果导出成功: %s，%d Sheet，%d 行', filePath, templateSheets.length + 1, rows.length);
+}
+
+// ==================== 配置导入/导出（JSON） ====================
+
+interface ConfigExportData {
+    version: number;
+    exportedAt: string;
+    tables: Record<string, Record<string, unknown>[]>;
+}
+
+/**
+ * 将所有相关表数据导出为 JSON 配置文件
+ * @param filePath 输出 JSON 文件路径
+ */
+export async function exportConfig(filePath: string): Promise<{ table: string; count: number }[]> {
+    const prisma = appDB.getPrisma();
+    const results: { table: string; count: number }[] = [];
+    const tablesData: Record<string, Record<string, unknown>[]> = {};
+
+    for (const table of allTables) {
+        const modelName = tableModelMap[table];
+        const clientName = toClientName(modelName);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = await (prisma as any)[clientName].findMany();
+        tablesData[table] = rows as Record<string, unknown>[];
+        results.push({ table, count: rows.length });
+        logger.info('[genAooi200] 导出 %s: %d 条', table, rows.length);
+    }
+
+    const data: ConfigExportData = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        tables: tablesData,
+    };
+
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
+
+    const total = results.reduce((sum, r) => sum + r.count, 0);
+    logger.info({ total, results }, '[genAooi200] 配置导出完成: %s', filePath);
+    return results;
+}
+
+/**
+ * 从 JSON 配置文件导入数据到所有相关表
+ * 先清空所有表，再插入数据
+ * @param filePath JSON 配置文件路径
+ */
+export async function importConfig(filePath: string): Promise<{ table: string; count: number }[]> {
+    const raw = await fs.readFile(filePath, 'utf-8');
+    const data: ConfigExportData = JSON.parse(raw);
+
+    if (!data.version || !data.tables) {
+        throw new Error('无效的配置文件格式：缺少 version 或 tables 字段');
+    }
+
+    const prisma = appDB.getPrisma();
+    const results: { table: string; count: number }[] = [];
+
+    for (const table of allTables) {
+        const modelName = tableModelMap[table];
+        const clientName = toClientName(modelName);
+        const rows = data.tables[table];
+
+        if (!rows || !Array.isArray(rows)) {
+            logger.warn('[genAooi200] 配置文件中未找到表 %s 的数据，跳过', table);
+            results.push({ table, count: 0 });
+            continue;
+        }
+
+        // 获取字段映射以进行类型转换
+        const fieldMap = getModelFieldMap(modelName);
+
+        const convertedRows = rows.map(row => convertRow(row, fieldMap));
+
+        await prisma.$transaction(async (tx) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const txn = tx as any;
+            await txn[clientName].deleteMany();
+            await txn[clientName].createMany({ data: convertedRows });
+        });
+
+        logger.info('[genAooi200] 导入 %s: %d 条', table, convertedRows.length);
+        results.push({ table, count: convertedRows.length });
+    }
+
+    const total = results.reduce((sum, r) => sum + r.count, 0);
+    logger.info({ total, results }, '[genAooi200] 配置导入完成: %s', filePath);
+    return results;
 }

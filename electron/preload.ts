@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aooi200ExportTemplate: () => ipcRenderer.invoke('aooi200:export-template'),
   aooi200ImportTemplate: (mode: string, connectionName?: string) => ipcRenderer.invoke('aooi200:import-template', mode, connectionName),
   aooi200ExportResult: (rows: unknown[], ooba001?: string) => ipcRenderer.invoke('aooi200:export-result', rows, ooba001),
+  aooi200ExportConfig: () => ipcRenderer.invoke('aooi200:export-config'),
+  aooi200ImportConfig: () => ipcRenderer.invoke('aooi200:import-config'),
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
     ipcRenderer.on('aooi200:validation-progress', listener)

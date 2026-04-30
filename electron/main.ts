@@ -7,7 +7,7 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-aooi200'
-import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2 } from './core/gen-aooi200'
+import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig } from './core/gen-aooi200'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
 
@@ -409,6 +409,46 @@ ipcMain.handle('aooi200:export-result', async (_event, rows: unknown[], ooba001?
     return { success: true }
   } catch (error) {
     logger.error(error, '[Main] 导出结果失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 导出系统配置（JSON）
+ipcMain.handle('aooi200:export-config', async () => {
+  try {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showSaveDialog(win!, {
+      title: '导出系统配置',
+      defaultPath: 'aooi200-config.json',
+      filters: [{ name: 'JSON 文件', extensions: ['json'] }],
+    })
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+    const results = await exportConfig(result.filePath)
+    return { success: true, results }
+  } catch (error) {
+    logger.error(error, '[Main] 导出系统配置失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 导入系统配置（JSON）
+ipcMain.handle('aooi200:import-config', async () => {
+  try {
+    const win = BrowserWindow.getFocusedWindow()
+    const fileResult = await dialog.showOpenDialog(win!, {
+      title: '导入系统配置',
+      filters: [{ name: 'JSON 文件', extensions: ['json'] }],
+      properties: ['openFile'],
+    })
+    if (fileResult.canceled || fileResult.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    const results = await importConfig(fileResult.filePaths[0])
+    return { success: true, results }
+  } catch (error) {
+    logger.error(error, '[Main] 导入系统配置失败')
     return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })

@@ -39,6 +39,7 @@ import {
   FileUp,
   FileDown,
   Save,
+  Database,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -60,6 +61,10 @@ function GenAooi200Page() {
   const [importedRows, setImportedRows] = useState<ImportRow[]>([])
   const [ooba001, setOoba001] = useState('S01')
   const [importError, setImportError] = useState<string | null>(null)
+
+  // 配置导入/导出状态
+  const [exportConfigLoading, setExportConfigLoading] = useState(false)
+  const [importConfigLoading, setImportConfigLoading] = useState(false)
 
   const fetchConnections = async () => {
     setConnectionsLoading(true)
@@ -127,6 +132,48 @@ function GenAooi200Page() {
       toast.error(err instanceof Error ? err.message : String(err))
     } finally {
       setCleanLoading(false)
+    }
+  }
+
+  const handleExportConfig = async () => {
+    setExportConfigLoading(true)
+    try {
+      const result = await window.electronAPI.aooi200ExportConfig()
+      if (result.canceled) return
+      if (result.success && result.results) {
+        setGenResult(result.results)
+        toast.success(`配置导出成功，共 ${result.results.reduce((s, r) => s + r.count, 0)} 条记录`)
+      } else {
+        toast.error(result.error ?? '导出失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setExportConfigLoading(false)
+    }
+  }
+
+  const handleImportConfig = async () => {
+    setImportConfigLoading(true)
+    setGenResult(null)
+    setError(null)
+    try {
+      const result = await window.electronAPI.aooi200ImportConfig()
+      if (result.canceled) return
+      if (result.success && result.results) {
+        setGenResult(result.results)
+        toast.success(`配置导入成功，共 ${result.results.reduce((s, r) => s + r.count, 0)} 条记录`)
+      } else {
+        const msg = result.error ?? '导入失败'
+        setError(msg)
+        toast.error(msg)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setImportConfigLoading(false)
     }
   }
 
@@ -290,6 +337,34 @@ function GenAooi200Page() {
               : <Trash2 className="size-3.5" />
             }
             {cleanLoading ? '清空中...' : '清空本地数据'}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportConfig}
+            disabled={exportConfigLoading}
+            className="gap-1.5"
+          >
+            {exportConfigLoading
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <Database className="size-3.5" />
+            }
+            {exportConfigLoading ? '导出中...' : '导出配置'}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleImportConfig}
+            disabled={importConfigLoading}
+            className="gap-1.5"
+          >
+            {importConfigLoading
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <Database className="size-3.5" />
+            }
+            {importConfigLoading ? '导入中...' : '导入配置'}
           </Button>
         </CardFooter>
       </Card>
