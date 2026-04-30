@@ -99,6 +99,9 @@ interface ElectronAPI {
   getAooi200SccOptions: (scc: string) => Promise<{ success: boolean; rows: Record<string, string>[]; error?: string }>
   aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => Promise<Aooi200ValidateResult>
   aooi200ValidateAooi200: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => Promise<Aooi200ValidateResult>
+  aooi200SwitchConnection: (connectionName: string) => Promise<{ success: boolean; error?: string }>
+  aooi200CleanSqlite: () => Promise<{ success: boolean; error?: string }>
+  aooi200GenData: (connectionName?: string) => Promise<{ success: boolean; results: { table: string; count: number }[]; error?: string }>
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>

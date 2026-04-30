@@ -7,6 +7,7 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-aooi200'
+import { genAooi200, cleanSqliteTables, switchExternalConnection } from './core/gen-aooi200'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
 
@@ -307,6 +308,39 @@ ipcMain.handle('aooi200:ecom-check', async (_event, entFrom: string, entTo: stri
       errors: [],
       message: error instanceof Error ? error.message : String(error),
     }
+  }
+})
+
+// IPC: 切换外部数据库连接
+ipcMain.handle('aooi200:switch-connection', async (_event, connectionName: string) => {
+  try {
+    await switchExternalConnection(connectionName)
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 切换外部连接失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 清空 SQLite gen-aooi200 相关表
+ipcMain.handle('aooi200:clean-sqlite', async () => {
+  try {
+    await cleanSqliteTables()
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 清空 SQLite 表失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 同步 gen-aooi200 数据到内部 SQLite
+ipcMain.handle('aooi200:gen-data', async (_event, connectionName?: string) => {
+  try {
+    const results = await genAooi200(connectionName)
+    return { success: true, results }
+  } catch (error) {
+    logger.error(error, '[Main] genAooi200 同步失败')
+    return { success: false, results: [], error: error instanceof Error ? error.message : String(error) }
   }
 })
 

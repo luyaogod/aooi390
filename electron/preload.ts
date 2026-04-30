@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAooi200SccOptions: (scc: string) => ipcRenderer.invoke('aooi200:get-scc-options', scc),
   aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => ipcRenderer.invoke('aooi200:validate-aooi199', entFrom, entTo, dlang, mode, oobx006, recalculate),
   aooi200ValidateAooi200: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => ipcRenderer.invoke('aooi200:validate-aooi200', entFrom, entTo, dlang, ooba001, mode),
+  aooi200SwitchConnection: (connectionName: string) => ipcRenderer.invoke('aooi200:switch-connection', connectionName),
+  aooi200CleanSqlite: () => ipcRenderer.invoke('aooi200:clean-sqlite'),
+  aooi200GenData: (connectionName?: string) => ipcRenderer.invoke('aooi200:gen-data', connectionName),
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
     ipcRenderer.on('aooi200:validation-progress', listener)

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Settings,
   ArrowLeftRight,
+  Database,
 } from 'lucide-react'
 
 interface NavItem {
@@ -26,6 +27,11 @@ const navItems: NavItem[] = [
     path: '/sync-aooi200',
     label: '单据别校验',
     icon: <ShieldCheck className="size-4" />,
+  },
+  {
+    path: '/gen-aooi200',
+    label: '单据管制表',
+    icon: <Database className="size-4" />,
   },
   {
     path: '/param-diff',

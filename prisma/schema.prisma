@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:D:/我的项目/aooi399/electron/app-data/database/app.db"
+  url      = "file:../electron/app-data/database/app.db"
 }
 
 model Oobx {
