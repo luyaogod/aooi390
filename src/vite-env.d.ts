@@ -103,7 +103,7 @@ interface ElectronAPI {
   aooi200CleanSqlite: () => Promise<{ success: boolean; error?: string }>
   aooi200GenData: (connectionName?: string) => Promise<{ success: boolean; results: { table: string; count: number }[]; error?: string }>
   aooi200ExportTemplate: () => Promise<{ success: boolean; canceled?: boolean; error?: string }>
-  aooi200ImportTemplate: (mode: string) => Promise<{ success: boolean; canceled?: boolean; rows?: ImportRow[]; error?: string }>
+  aooi200ImportTemplate: (mode: string, connectionName?: string) => Promise<{ success: boolean; canceled?: boolean; rows?: ImportRow[]; error?: string }>
   aooi200ExportResult: (rows: unknown[]) => Promise<{ success: boolean; canceled?: boolean; error?: string }>
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API

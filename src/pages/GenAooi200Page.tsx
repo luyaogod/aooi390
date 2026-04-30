@@ -28,6 +28,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
+import { RadioGroup } from '@/components/ui/radio-group'
 import {
   Loader2,
   Download,
@@ -52,6 +53,7 @@ function GenAooi200Page() {
 
   // 导入/导出相关状态
   const [queryMode, setQueryMode] = useState<'internal' | 'external'>('internal')
+  const [importConnectionName, setImportConnectionName] = useState('')
   const [importLoading, setImportLoading] = useState(false)
   const [exportResultLoading, setExportResultLoading] = useState(false)
   const [importedRows, setImportedRows] = useState<ImportRow[]>([])
@@ -63,6 +65,10 @@ function GenAooi200Page() {
       const result = await window.electronAPI.getExternalDBConnections()
       if (result.success) {
         setConnections(result.connections)
+        if (result.connections.length > 0) {
+          const def = result.connections.find(c => c.isDefault)
+          setImportConnectionName(def?.name ?? result.connections[0].name)
+        }
       }
     } catch (err) {
       console.error('获取外部连接列表失败:', err)
@@ -141,7 +147,10 @@ function GenAooi200Page() {
     setImportedRows([])
     setImportError(null)
     try {
-      const result = await window.electronAPI.aooi200ImportTemplate(queryMode)
+      const result = await window.electronAPI.aooi200ImportTemplate(
+        queryMode,
+        queryMode === 'external' ? importConnectionName : undefined,
+      )
       if (result.canceled) return
       if (result.success && result.rows) {
         setImportedRows(result.rows)
@@ -291,18 +300,39 @@ function GenAooi200Page() {
 
         <CardContent className="flex flex-col gap-4">
           <Field label="查询模式">
-            <Select value={queryMode} onValueChange={(v) => setQueryMode(v as 'internal' | 'external')}>
-              <SelectTrigger className="w-72">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value="internal">内部 SQLite（已同步数据）</SelectItem>
-                  <SelectItem value="external">外部数据库（直连）</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <RadioGroup
+              value={queryMode}
+              onValueChange={(v) => setQueryMode(v as 'internal' | 'external')}
+              options={[
+                { label: '内部 SQLite', value: 'internal', description: '从已同步的本地数据库查询' },
+                { label: '外部数据库', value: 'external', description: '直连 Oracle/Kingbase 查询' },
+              ]}
+            />
           </Field>
+
+          {queryMode === 'external' && !connectionsLoading && connections.length > 0 && (
+            <Field label="选择外部连接">
+              <Select
+                value={importConnectionName}
+                onValueChange={(value) => {
+                  if (value) setImportConnectionName(value)
+                }}
+              >
+                <SelectTrigger className="w-72">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {connections.map((conn) => (
+                      <SelectItem key={conn.name} value={conn.name}>
+                        {conn.name}{conn.isDefault ? ' (默认)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
 
           {importError && (
             <Alert variant="destructive">

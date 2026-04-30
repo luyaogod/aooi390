@@ -365,8 +365,11 @@ ipcMain.handle('aooi200:export-template', async () => {
 })
 
 // IPC: 导入 Excel 模板并解析
-ipcMain.handle('aooi200:import-template', async (_event, mode: string) => {
+ipcMain.handle('aooi200:import-template', async (_event, mode: string, connectionName?: string) => {
   try {
+    if (mode === 'external' && connectionName) {
+      await switchExternalConnection(connectionName)
+    }
     const win = BrowserWindow.getFocusedWindow()
     const fileResult = await dialog.showOpenDialog(win!, {
       title: '选择导入模板',

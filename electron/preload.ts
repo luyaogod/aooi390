@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aooi200CleanSqlite: () => ipcRenderer.invoke('aooi200:clean-sqlite'),
   aooi200GenData: (connectionName?: string) => ipcRenderer.invoke('aooi200:gen-data', connectionName),
   aooi200ExportTemplate: () => ipcRenderer.invoke('aooi200:export-template'),
-  aooi200ImportTemplate: (mode: string) => ipcRenderer.invoke('aooi200:import-template', mode),
+  aooi200ImportTemplate: (mode: string, connectionName?: string) => ipcRenderer.invoke('aooi200:import-template', mode, connectionName),
   aooi200ExportResult: (rows: unknown[]) => ipcRenderer.invoke('aooi200:export-result', rows),
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
