@@ -387,33 +387,23 @@ ipcMain.handle('aooi200:import-template', async (_event, mode: string, connectio
   }
 })
 
-// IPC: 导出解析结果（两个文件）
+// IPC: 导出解析结果（选择目录，一次性保存 aooi199.xlsx 和 aooi200.xlsx）
 ipcMain.handle('aooi200:export-result', async (_event, rows: unknown[], ooba001?: string) => {
   try {
     const win = BrowserWindow.getFocusedWindow()
-    // 第一个文件：单据别处理结果（13 列）
-    const r1 = await dialog.showSaveDialog(win!, {
-      title: '导出单据别处理结果',
-      defaultPath: 'AOOI200单据别处理结果.xlsx',
-      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+    const dirResult = await dialog.showOpenDialog(win!, {
+      title: '选择保存目录',
+      properties: ['openDirectory'],
     })
-    if (r1.canceled || !r1.filePath) {
+    if (dirResult.canceled || !dirResult.filePaths.length) {
       return { success: false, canceled: true }
     }
-    await exportAooi200Result(rows as Parameters<typeof exportAooi200Result>[0], r1.filePath)
 
-    // 第二个文件：多 Sheet 模板（仅 Sheet1 填充数据）
-    const r2 = await dialog.showSaveDialog(win!, {
-      title: '导出多Sheet导入模板',
-      defaultPath: 'AOOI200导入模板.xlsx',
-      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
-    })
-    if (r2.canceled || !r2.filePath) {
-      return { success: true } // 第一个文件已保存成功
-    }
+    const dir = dirResult.filePaths[0]
+    await exportAooi200Result(rows as Parameters<typeof exportAooi200Result>[0], path.join(dir, 'aooi199.xlsx'))
     await exportAooi200Result2(
       rows as Parameters<typeof exportAooi200Result2>[0],
-      r2.filePath,
+      path.join(dir, 'aooi200.xlsx'),
       (ooba001 as string) || 'S01',
     )
     return { success: true }

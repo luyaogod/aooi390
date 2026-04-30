@@ -176,7 +176,7 @@ function GenAooi200Page() {
       const result = await window.electronAPI.aooi200ExportResult(importedRows, ooba001)
       if (result.canceled) return
       if (result.success) {
-        toast.success('处理结果保存成功')
+        toast.success('已保存 aooi199.xlsx 和 aooi200.xlsx')
       } else {
         toast.error(result.error ?? '保存失败')
       }
