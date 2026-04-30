@@ -351,24 +351,24 @@ export class Aooi200QueryService {
     }
 
     /**
-     * 根据单据性质查询模组
-     * @param gzcb002 单据性质
-     * @returns 模组 (gzcb003)
+     * 根据作业编号查询归属模块(gzzz005→oobx002)和单据性质(gzzz006→oobx003)
+     * @param gzzz001 作业编号
+     * @returns { gzzz005, gzzz006 } 或 null
      */
-    async gzcb004Get(gzcb002: string): Promise<string> {
-        logger.debug({ mode: this.mode, gzcb002 }, '[Aooi200Query] gzcb004Get: 查询单据性质对应的模组');
+    async gzzzInfoGet(gzzz001: string): Promise<{ gzzz005: string; gzzz006: string } | null> {
+        logger.debug({ mode: this.mode, gzzz001 }, '[Aooi200Query] gzzzInfoGet: 查询作业编号的归属模块和单据性质');
         const sql = `
-            SELECT DISTINCT gzcb003
-            FROM gzcb_t
-            LEFT OUTER JOIN gzcbl_t ON gzcb001 = gzcbl001 AND gzcb002 = gzcbl002 AND gzcbl003 = 'zh_CN'
-            WHERE 1=1
-              AND gzcb001 = '24'
-              AND gzcb002 = '${gzcb002}'
-            ORDER BY gzcb002
+            SELECT gzzz005, gzzz006
+            FROM gzzz_t
+            WHERE gzzz001 = '${gzzz001}'
         `;
-        logger.debug({ sql }, '[Aooi200Query] gzcb004Get: 查询 SQL');
+        logger.debug({ sql }, '[Aooi200Query] gzzzInfoGet: 查询 SQL');
         const rows = await this.query(sql);
-        return rows.length > 0 ? String(rows[0]['gzcb003'] ?? '') : '';
+        if (rows.length === 0) return null;
+        return {
+            gzzz005: String(rows[0]['gzzz005'] ?? ''),
+            gzzz006: String(rows[0]['gzzz006'] ?? ''),
+        };
     }
 
     /**
@@ -404,7 +404,7 @@ export type OobxImportRow = Oobx & { oobxl003: string };
 /**
  * 从 Excel 模板读取用户导入的数据，转换为 Oobx 行
  * A列→oobx001, B列→oobxl003, C列→oobx004
- * oobx003 通过 gzzz006Get(oobx004) 获取，oobx002 通过 gzcb004Get(oobx003) 获取
+ * oobx002、oobx003 通过 gzzzInfoGet(oobx004) 一次查询获取
  * @param filePath Excel 文件路径
  * @param mode     查询模式（默认 internal，从内部 SQLite 查）
  * @returns Oobx 导入行数组
@@ -437,14 +437,13 @@ export async function importAooi200Template(filePath: string, mode: QueryMode = 
     const rows: OobxImportRow[] = [];
 
     for (const raw of rawRows) {
-        const oobx003 = raw.oobx004 ? await svc.gzzz006Get(raw.oobx004) : '';
-        const oobx002 = oobx003 ? await svc.gzcb004Get(oobx003) : '';
+        const info = raw.oobx004 ? await svc.gzzzInfoGet(raw.oobx004) : null;
 
         rows.push({
             oobxent: 0,
             oobx001: raw.oobx001,
-            oobx002: oobx002 || null,
-            oobx003: oobx003 || null,
+            oobx002: info?.gzzz005 || null,
+            oobx003: info?.gzzz006 || null,
             oobx004: raw.oobx004 || null,
             oobx005: 'Y',
             oobx006: '6',
