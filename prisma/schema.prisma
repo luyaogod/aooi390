@@ -438,3 +438,169 @@ model Oobk {
   @@map("oobk_t")
 }
 
+model Gzcb {
+  gzcb001   Int       // 系统分类码
+  gzcb002   String    // 系统分类码值
+  gzcb003   String?   // 系统应用字段一
+  gzcb004   String?   // 系统应用字段二
+  gzcb005   String?   // 系统应用字段三
+  gzcb006   String?   // 系统应用字段四
+  gzcb007   String?   // 系统应用字段五
+  gzcb008   String?   // 系统应用字段六
+  gzcb009   String?   // 系统应用字段七
+  gzcb010   String?   // 系统应用字段八
+  gzcb011   String?   // 系统应用字段九
+  gzcb012   String?   // 选项顺序
+  gzcb013   String?   // 客制
+  gzcb014   String?   // 备注
+  gzcb015   String?   // 库存异动分类
+  gzcbud001 String?   // 自定义字段(文本)001
+  gzcbud002 String?   // 自定义字段(文本)002
+  gzcbud003 String?   // 自定义字段(文本)003
+  gzcbud004 String?   // 自定义字段(文本)004
+  gzcbud005 String?   // 自定义字段(文本)005
+  gzcbud006 String?   // 自定义字段(文本)006
+  gzcbud007 String?   // 自定义字段(文本)007
+  gzcbud008 String?   // 自定义字段(文本)008
+  gzcbud009 String?   // 自定义字段(文本)009
+  gzcbud010 String?   // 自定义字段(文本)010
+  gzcbud011 Float?    // 自定义字段(数字)011
+  gzcbud012 Float?    // 自定义字段(数字)012
+  gzcbud013 Float?    // 自定义字段(数字)013
+  gzcbud014 Float?    // 自定义字段(数字)014
+  gzcbud015 Float?    // 自定义字段(数字)015
+  gzcbud016 Float?    // 自定义字段(数字)016
+  gzcbud017 Float?    // 自定义字段(数字)017
+  gzcbud018 Float?    // 自定义字段(数字)018
+  gzcbud019 Float?    // 自定义字段(数字)019
+  gzcbud020 Float?    // 自定义字段(数字)020
+  gzcbud021 DateTime? // 自定义字段(日期时间)021
+  gzcbud022 DateTime? // 自定义字段(日期时间)022
+  gzcbud023 DateTime? // 自定义字段(日期时间)023
+  gzcbud024 DateTime? // 自定义字段(日期时间)024
+  gzcbud025 DateTime? // 自定义字段(日期时间)025
+  gzcbud026 DateTime? // 自定义字段(日期时间)026
+  gzcbud027 DateTime? // 自定义字段(日期时间)027
+  gzcbud028 DateTime? // 自定义字段(日期时间)028
+  gzcbud029 DateTime? // 自定义字段(日期时间)029
+  gzcbud030 DateTime? // 自定义字段(日期时间)030
+
+  @@id([gzcb001, gzcb002])
+  @@map("gzcb_t")
+}
+
+model Gzcbl {
+  gzcbl001 Int     // 系统分类码
+  gzcbl002 String  // 系统分类值
+  gzcbl003 String  // 语言别
+  gzcbl004 String? // 说明
+  gzcbl005 String? // 注记码
+  gzcbl006 String? // 应用说明
+  gzcbl007 String? // 客制
+
+  @@id([gzcbl001, gzcbl002, gzcbl003])
+  @@map("gzcbl_t")
+}
+
+model Gzza {
+  gzzastus  String?   // 状态码
+  gzza001   String    // 程序编号
+  gzza002   String?   // 程序类别
+  gzza003   String?   // 归属模块
+  gzza004   String?   // 系统运行指令
+  gzza005   String?   // 单身显示笔数处理方法
+  gzza006   String?   // 可于更改时调整主要键值(PK)数据
+  gzza007   Int?      // 最大单身显示笔数
+  gzza008   String?   // 引用主程序编号
+  gzza009   String?   // 执行时生成SQL操作历程档 (在 $LOGDIR)
+  gzza010   String?   // 将错误消息写入LOG
+  gzza011   String?   // 客制
+  gzza012   String?   // 处理闲置连接方式
+  gzza013   String?   // 处理闲置连接关闭的作法
+  gzza014   Int?      // 闲置时间 (秒)
+  gzza015   String?   // 归属行业别
+  gzza016   String?   // 程序可维护(特别开发属性)
+  gzzaownid String?   // 资料所有者
+  gzzaowndp String?   // 资料所有部门
+  gzzacrtid String?   // 资料录入者
+  gzzacrtdp String?   // 资料录入部门
+  gzzacrtdt DateTime? // 资料创建日
+  gzzamodid String?   // 资料更改者
+  gzzamoddt DateTime? // 最近更改日
+  gzza017   String?   // 单据日期控管方式
+  gzza018   String?   // 过账日期控管方式
+  gzza019   String?   // Q类作业上阶串查作业编号
+  gzza020   String?   // Q类作业上阶串查使用字段
+  gzza021   String?   // 允许运行环境
+  gzza022   String?   // 可不受闲置时间控管的营运据点
+  gzza023   String?   // 与POI串接
+  gzza024   Int?      // POI内存使用上限(1-80)
+
+  @@id([gzza001])
+  @@map("gzza_t")
+}
+
+model Gzzal {
+  gzzal001 String  // 程序编号
+  gzzal002 String  // 语言别
+  gzzal003 String? // 程序名称
+  gzzal004 String? // 助记码
+  gzzal005 String? // 程序简称
+  gzzal006 String? // 客制
+
+  @@id([gzzal001, gzzal002])
+  @@map("gzzal_t")
+}
+
+model Gzzj {
+  gzzj001   String    // 实际模块编号
+  gzzj002   String?   // 功能类别
+  gzzj003   String?   // 归属模块编号
+  gzzjownid String?   // 资料所有者
+  gzzjowndp String?   // 资料所有部门
+  gzzjcrtid String?   // 资料录入者
+  gzzjcrtdp String?   // 资料录入部门
+  gzzjcrtdt DateTime? // 资料创建日
+  gzzjmodid String?   // 资料更改者
+  gzzjmoddt DateTime? // 最近更改日
+  gzzjstus  String?   // 状态码
+
+  @@id([gzzj001])
+  @@map("gzzj_t")
+}
+
+model Gzzol {
+  gzzol001 String  // 模块编号
+  gzzol002 String  // 语言别
+  gzzol003 String? // 模组名称
+  gzzol004 String? // 助记码
+
+  @@id([gzzol001, gzzol002])
+  @@map("gzzol_t")
+}
+
+model Gzzz {
+  gzzzstus  String?   // 状态码
+  gzzz001   String    // 作业编号
+  gzzz002   String?   // 程序编号
+  gzzz003   Int?      // 应用参数组编号
+  gzzz004   String?   // 额外参数
+  gzzzownid String?   // 资料所有者
+  gzzzowndp String?   // 资料所有部门
+  gzzzcrtid String?   // 资料录入者
+  gzzzcrtdp String?   // 资料录入部门
+  gzzzcrtdt DateTime? // 资料创建日
+  gzzzmodid String?   // 资料更改者
+  gzzzmoddt DateTime? // 最近更改日
+  gzzz005   String?   // 归属模块
+  gzzz006   String?   // 默认单据性质
+  gzzz007   String?   // 布景编号
+  gzzz008   String?   // 色调编号
+  gzzz009   String?   // 作业操作模式
+  gzzz010   String?   // 归属行业别
+  gzzz011   String?   // no use
+
+  @@id([gzzz001])
+  @@map("gzzz_t")
+}
+

@@ -32,3 +32,5 @@ dev-utils/
 
 .vscode/
 .qoder/
+
+*.db
