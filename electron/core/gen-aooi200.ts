@@ -464,11 +464,7 @@ export async function importAooi200Template(filePath: string, mode: QueryMode = 
  */
 export async function exportAooi200Result(rows: OobxImportRow[], filePath: string): Promise<void> {
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Sheet1');
-
-    const border = { style: 'thin' as const, color: { argb: 'FF000000' } };
-    const allBorders = { top: border, bottom: border, left: border, right: border };
-    const yellow = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFFF00' } };
+    const sheet = workbook.addWorksheet('sheet1');
 
     // 固定 8 行说明行 (行1–8)
     const fixedRows = [
@@ -481,26 +477,7 @@ export async function exportAooi200Result(rows: OobxImportRow[], filePath: strin
         ['(请勿删除)范例1', '1', 'Y', 'A530', '采购收货入库单', 'APM', 'apmt530', 'MULTI', 'Y', '1', '6', 'SS-A530-YYMM999999', 'Y'],
         ['(请勿删除)范例2', '2', 'Y', 'A501', '原辅料采购单', 'APM', 'apmt500', 'MULTI', 'Y', '1', '6', 'SS-A501-YYMM999999', 'Y'],
     ];
-
-    fixedRows.forEach((data, rowIdx) => {
-        const row = sheet.getRow(rowIdx + 1);
-        data.forEach((val, colIdx) => {
-            const cell = row.getCell(colIdx + 1);
-            cell.value = val;
-            cell.border = allBorders;
-            // 第5行：标记 * 或 KEY 的单元格黄色底纹
-            if (rowIdx === 4 && (val === '*' || val === 'KEY')) {
-                cell.fill = yellow;
-            }
-        });
-    });
-
-    // 第9行：标记行
-    const markerRow = sheet.getRow(9);
-    markerRow.getCell(1).value = '由此行开始输入→';
-    for (let c = 1; c <= 13; c++) {
-        markerRow.getCell(c).border = allBorders;
-    }
+    writeFixedRows(sheet, fixedRows);
 
     // 正式数据从第9行开始
     rows.forEach((row, idx) => {
@@ -538,7 +515,6 @@ export async function exportAooi200Result(rows: OobxImportRow[], filePath: strin
 
 const border = { style: 'thin' as const, color: { argb: 'FF000000' } };
 const allBorders = { top: border, bottom: border, left: border, right: border };
-const yellow = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFFF00' } };
 
 /** 写入固定 8 行说明行 + 第 9 行标记行，返回列数 */
 function writeFixedRows(sheet: ExcelJS.Worksheet, rows: string[][]): number {
@@ -549,17 +525,11 @@ function writeFixedRows(sheet: ExcelJS.Worksheet, rows: string[][]): number {
             const cell = row.getCell(colIdx + 1);
             cell.value = val;
             cell.border = allBorders;
-            if (rowIdx === 4 && (val === '*' || val === 'KEY')) {
-                cell.fill = yellow;
-            }
         });
     });
     // 第 9 行标记
     const marker = sheet.getRow(9);
     marker.getCell(1).value = '由此行开始输入→';
-    for (let c = 1; c <= colCount; c++) {
-        marker.getCell(c).border = allBorders;
-    }
     return colCount;
 }
 
