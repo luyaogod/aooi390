@@ -458,7 +458,7 @@ export async function importAooi200Template(filePath: string, mode: QueryMode = 
 
 /**
  * 将解析后的 Oobx 导入数据导出为 Excel（A-M 列）
- * A:空 B:流水号(从1开始) C:oobxstus D:oobx001 E:oobxl003 F-M:oobx002-oobx009
+ * 前 8 行为固定说明行（全框线），正式数据从第 9 行开始
  * @param rows     Oobx 导入行数组
  * @param filePath 输出文件路径
  */
@@ -466,19 +466,45 @@ export async function exportAooi200Result(rows: OobxImportRow[], filePath: strin
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Sheet1');
 
-    // 表头
-    const headers = ['', '流水号', '状态', '单据别', '名称', '模组别', '单据性质', '对应作业编号', '自动编码否', '期别码', '所剩流水号长度', '编码结果', '于aoor700揭露'];
-    const headerRow = sheet.getRow(1);
-    headers.forEach((h, i) => {
-        const cell = headerRow.getCell(i + 1);
-        cell.value = h;
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    const border = { style: 'thin' as const, color: { argb: 'FF000000' } };
+    const allBorders = { top: border, bottom: border, left: border, right: border };
+    const yellow = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFFF00' } };
+
+    // 固定 8 行说明行 (行1–8)
+    const fixedRows = [
+        ['字段编号', 'old_docno', 'oobxstus', 'oobx001', 'oobxl003', 'oobx002', 'oobx003', 'oobx004', 'oobx005', 'oobx006', 'oobx007', 'oobx008', 'oobx009'],
+        ['字段说明', '汇入顺序', '状态码', '单据别', '说明', '模组别', '单据性质', '对应作业编号', '自动编码否', '期别码', '所剩流水号长度', '编码结果', '于aoor700揭露'],
+        ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'NUMBER', 'VARCHAR2', 'VARCHAR2'],
+        ['格式/精度/长度', '', '10', '5', '500', '4', '10', '40', '1', '1', 'NUMBER(10,0)', '20', '1'],
+        ['(黄底栏位)必填', '*', '*', 'KEY', '', '*', '*', '*', '*', '*', '', '*', '*'],
+        ['SCC', '', '', '', '', '', '', '', '', '', '', '', ''],
+        ['(请勿删除)范例1', '1', 'Y', 'A530', '采购收货入库单', 'APM', 'apmt530', 'MULTI', 'Y', '1', '6', 'SS-A530-YYMM999999', 'Y'],
+        ['(请勿删除)范例2', '2', 'Y', 'A501', '原辅料采购单', 'APM', 'apmt500', 'MULTI', 'Y', '1', '6', 'SS-A501-YYMM999999', 'Y'],
+    ];
+
+    fixedRows.forEach((data, rowIdx) => {
+        const row = sheet.getRow(rowIdx + 1);
+        data.forEach((val, colIdx) => {
+            const cell = row.getCell(colIdx + 1);
+            cell.value = val;
+            cell.border = allBorders;
+            // 第5行：标记 * 或 KEY 的单元格黄色底纹
+            if (rowIdx === 4 && (val === '*' || val === 'KEY')) {
+                cell.fill = yellow;
+            }
+        });
     });
 
-    // 数据行
+    // 第9行：标记行
+    const markerRow = sheet.getRow(9);
+    markerRow.getCell(1).value = '由此行开始输入→';
+    for (let c = 1; c <= 13; c++) {
+        markerRow.getCell(c).border = allBorders;
+    }
+
+    // 正式数据从第9行开始
     rows.forEach((row, idx) => {
-        const r = sheet.getRow(idx + 2);
+        const r = sheet.getRow(idx + 9);
         r.getCell(1).value = '';                    // A: 空
         r.getCell(2).value = idx + 1;               // B: 流水号
         r.getCell(3).value = row.oobxstus;          // C
@@ -495,13 +521,213 @@ export async function exportAooi200Result(rows: OobxImportRow[], filePath: strin
     });
 
     // 列宽
-    sheet.getColumn(1).width = 4;
-    sheet.getColumn(2).width = 8;
-    sheet.getColumn(3).width = 6;
-    for (let i = 4; i <= 13; i++) {
+    sheet.getColumn(1).width = 18;
+    sheet.getColumn(2).width = 10;
+    sheet.getColumn(3).width = 8;
+    sheet.getColumn(4).width = 10;
+    sheet.getColumn(5).width = 20;
+    for (let i = 6; i <= 13; i++) {
         sheet.getColumn(i).width = 16;
     }
 
     await workbook.xlsx.writeFile(filePath);
     logger.info('[genAooi200] 处理结果导出成功: %s，共 %d 行', filePath, rows.length);
+}
+
+// ==================== Sheet 固定模板工具 ====================
+
+const border = { style: 'thin' as const, color: { argb: 'FF000000' } };
+const allBorders = { top: border, bottom: border, left: border, right: border };
+const yellow = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFFF00' } };
+
+/** 写入固定 8 行说明行 + 第 9 行标记行，返回列数 */
+function writeFixedRows(sheet: ExcelJS.Worksheet, rows: string[][]): number {
+    const colCount = rows[0].length;
+    rows.forEach((data, rowIdx) => {
+        const row = sheet.getRow(rowIdx + 1);
+        data.forEach((val, colIdx) => {
+            const cell = row.getCell(colIdx + 1);
+            cell.value = val;
+            cell.border = allBorders;
+            if (rowIdx === 4 && (val === '*' || val === 'KEY')) {
+                cell.fill = yellow;
+            }
+        });
+    });
+    // 第 9 行标记
+    const marker = sheet.getRow(9);
+    marker.getCell(1).value = '由此行开始输入→';
+    for (let c = 1; c <= colCount; c++) {
+        marker.getCell(c).border = allBorders;
+    }
+    return colCount;
+}
+
+// ==================== Excel 导出（多 Sheet） ====================
+
+/**
+ * 导出多 Sheet 模板，Sheet1(参照表定义) 有数据填充，其余 Sheet 仅固定模板
+ * @param rows     Oobx 导入行数组
+ * @param filePath 输出文件路径
+ * @param ooba001 参照表编号，默认 'S01'
+ */
+export async function exportAooi200Result2(
+    rows: OobxImportRow[],
+    filePath: string,
+    ooba001: string = 'S01',
+): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+
+    const s1 = workbook.addWorksheet('参照表定义');
+    const s1Headers = [
+        ['字段编号', 'old_docno', 'ooba001', 'ooba002', 'ooba008', 'ooba009', 'ooba010', 'ooba011', 'ooba012', 'ooba013', 'ooba014', 'ooba015', 'ooba016'],
+        ['字段说明', '汇入顺序', '参照表编号', '单据别编号', '可用From', '可用To', 'MRP可用From', 'MRP可用To', '成本仓From', '成本仓To', '产品分类-正/负向表列', '理由码-正/负向表列', '备注'],
+        ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+        ['格式/精度/长度', '', '5', '5', '1', '1', '1', '1', '1', '1', '1', '1', '255'],
+        ['(黄底栏位)必填', '*', 'KEY', 'KEY', '', '', '', '', '', '', '', '', ''],
+        ['SCC', '', '', '', 'Y/N', 'Y/N', 'Y/N', 'Y/N', 'Y/N', 'Y/N', '', '', ''],
+        ['(请勿删除)范例1', '1', 'S01', 'TE21', '', '', '', '', '', '', '', '1', '1'],
+        ['(请勿删除)范例2', '2', 'S01', 'TE21', '', '', '', '', '', '', '', '1', '1'],
+    ];
+    writeFixedRows(s1, s1Headers);
+    // 填充数据（从第9行开始）
+    rows.forEach((row, idx) => {
+        const r = s1.getRow(idx + 9);
+        r.getCell(1).value = '';             // A: 空
+        r.getCell(2).value = idx + 1;        // B: 流水号
+        r.getCell(3).value = ooba001;        // C: 参照表编号
+        r.getCell(4).value = row.oobx001;    // D: 单据别编号
+    });
+    s1.getColumn(1).width = 4;
+    s1.getColumn(2).width = 10;
+    s1.getColumn(3).width = 14;
+    s1.getColumn(4).width = 14;
+    for (let i = 5; i <= s1Headers[0].length; i++) {
+        s1.getColumn(i).width = 14;
+    }
+
+    // --- 其余 Sheet：仅固定模板 ---
+    const templateSheets: { name: string; headers: string[][]; widths: number[] }[] = [
+        {
+            name: '字段定义',
+            headers: [
+                ['字段编号', 'old_docno', 'oobb001', 'oobb002', 'oobb003', 'oobb004', 'oobb005', 'oobb006', 'oobb007', 'oobb008'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '序号', '字段编号', '默认值', '默认值说明', '可更改', '备注'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'NUMBER', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', 'NUMBER(10,0)', '20', '100', '255', '1', '255'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY', '*', '', '', '*', ''],
+                ['SCC', '', '', '', '', '', '', '', 'Y/N', ''],
+                ['(请勿删除)范例1', '1', 'S01', 'T001', '1', 'sfajwf013', '1', '手动挑片', 'N', ''],
+                ['(请勿删除)范例2', '2', 'S01', 'T001', '1', 'sfajwf013', '1', '手动挑片', 'N', ''],
+            ],
+            widths: [4, 10, 14, 12, 8, 14, 14, 16, 10, 20],
+        },
+        {
+            name: '控制组',
+            headers: [
+                ['字段编号', 'old_docno', 'oobc001', 'oobc002', 'oobc003', 'oobc004'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '控制组编号', '控制组类型'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', '20', '10'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY', '*'],
+                ['SCC', '', '', '', '', ''],
+                ['(请勿删除)范例1', '1', '', '', '', ''],
+                ['(请勿删除)范例2', '2', '', '', '', ''],
+            ],
+            widths: [4, 10, 14, 12, 16, 14],
+        },
+        {
+            name: '生命周期',
+            headers: [
+                ['字段编号', 'old_docno', 'oobd001', 'oobd002', 'oobd003', 'oobd004'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '生命周期类型', '生命周期编号'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', '10', '10'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY', 'KEY'],
+                ['SCC', '', '', '', '', ''],
+                ['(请勿删除)范例1', '1', '', '', '', ''],
+                ['(请勿删除)范例2', '2', '', '', '', ''],
+            ],
+            widths: [4, 10, 14, 12, 16, 16],
+        },
+        {
+            name: '产品分类',
+            headers: [
+                ['字段编号', 'old_docno', 'oobh001', 'oobh002', 'oobh003'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '产品分类'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', '10'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY'],
+                ['SCC', '', '', '', ''],
+                ['(请勿删除)范例1', '1', '', '', ''],
+                ['(请勿删除)范例2', '2', '', '', ''],
+            ],
+            widths: [4, 10, 14, 12, 14],
+        },
+        {
+            name: '库存标签F',
+            headers: [
+                ['字段编号', 'old_docno', 'oobj001', 'oobj002', 'oobj003'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '库存标签编号'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', '10'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY'],
+                ['SCC', '', '', '', ''],
+                ['(请勿删除)范例1', '1', '', '', ''],
+                ['(请勿删除)范例2', '2', '', '', ''],
+            ],
+            widths: [4, 10, 14, 12, 18],
+        },
+        {
+            name: '库存标签T',
+            headers: [
+                ['字段编号', 'old_docno', 'oobk001', 'oobk002', 'oobk003'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '库存标签编号'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', '10'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY'],
+                ['SCC', '', '', '', ''],
+                ['(请勿删除)范例1', '1', '', '', ''],
+                ['(请勿删除)范例2', '2', '', '', ''],
+            ],
+            widths: [4, 10, 14, 12, 18],
+        },
+        {
+            name: '单身理由码',
+            headers: [
+                ['字段编号', 'old_docno', 'oobi001', 'oobi002', 'oobi003'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '单身理由码'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', '10'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY'],
+                ['SCC', '', '', '', ''],
+                ['(请勿删除)范例1', '1', '', '', ''],
+                ['(请勿删除)范例2', '2', '', '', ''],
+            ],
+            widths: [4, 10, 14, 12, 14],
+        },
+        {
+            name: '参数设定',
+            headers: [
+                ['字段编号', 'old_docno', 'ooac001', 'ooac002', 'ooac003', 'ooac004'],
+                ['字段说明', '汇入顺序', '参照表号', '单据别', '参数编号', '参数值'],
+                ['字段类型', '', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2', 'VARCHAR2'],
+                ['格式/精度/长度', '', '5', '5', '10', '80'],
+                ['(黄底栏位)必填', '*', 'KEY', 'KEY', 'KEY', ''],
+                ['SCC', '', '', '', '', ''],
+                ['(请勿删除)范例1', '1', 'S01', '1200', 'D-BAS-0102', 'Y'],
+                ['(请勿删除)范例2', '2', 'S01', '1200', 'D-BAS-0102', 'Y'],
+            ],
+            widths: [4, 10, 14, 12, 16, 14],
+        },
+    ];
+
+    for (const s of templateSheets) {
+        const sheet = workbook.addWorksheet(s.name);
+        writeFixedRows(sheet, s.headers);
+        s.widths.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+    logger.info('[genAooi200] 多Sheet处理结果导出成功: %s，%d Sheet，%d 行', filePath, templateSheets.length + 1, rows.length);
 }

@@ -7,7 +7,7 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-aooi200'
-import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result } from './core/gen-aooi200'
+import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2 } from './core/gen-aooi200'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
 
@@ -387,19 +387,35 @@ ipcMain.handle('aooi200:import-template', async (_event, mode: string, connectio
   }
 })
 
-// IPC: 导出解析结果
-ipcMain.handle('aooi200:export-result', async (_event, rows: unknown[]) => {
+// IPC: 导出解析结果（两个文件）
+ipcMain.handle('aooi200:export-result', async (_event, rows: unknown[], ooba001?: string) => {
   try {
     const win = BrowserWindow.getFocusedWindow()
-    const result = await dialog.showSaveDialog(win!, {
-      title: '导出处理结果',
-      defaultPath: 'AOOI200处理结果.xlsx',
+    // 第一个文件：单据别处理结果（13 列）
+    const r1 = await dialog.showSaveDialog(win!, {
+      title: '导出单据别处理结果',
+      defaultPath: 'AOOI200单据别处理结果.xlsx',
       filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
     })
-    if (result.canceled || !result.filePath) {
+    if (r1.canceled || !r1.filePath) {
       return { success: false, canceled: true }
     }
-    await exportAooi200Result(rows as Parameters<typeof exportAooi200Result>[0], result.filePath)
+    await exportAooi200Result(rows as Parameters<typeof exportAooi200Result>[0], r1.filePath)
+
+    // 第二个文件：多 Sheet 模板（仅 Sheet1 填充数据）
+    const r2 = await dialog.showSaveDialog(win!, {
+      title: '导出多Sheet导入模板',
+      defaultPath: 'AOOI200导入模板.xlsx',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+    })
+    if (r2.canceled || !r2.filePath) {
+      return { success: true } // 第一个文件已保存成功
+    }
+    await exportAooi200Result2(
+      rows as Parameters<typeof exportAooi200Result2>[0],
+      r2.filePath,
+      (ooba001 as string) || 'S01',
+    )
     return { success: true }
   } catch (error) {
     logger.error(error, '[Main] 导出结果失败')

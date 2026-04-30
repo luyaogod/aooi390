@@ -28,6 +28,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { RadioGroup } from '@/components/ui/radio-group'
 import {
   Loader2,
@@ -57,6 +58,7 @@ function GenAooi200Page() {
   const [importLoading, setImportLoading] = useState(false)
   const [exportResultLoading, setExportResultLoading] = useState(false)
   const [importedRows, setImportedRows] = useState<ImportRow[]>([])
+  const [ooba001, setOoba001] = useState('S01')
   const [importError, setImportError] = useState<string | null>(null)
 
   const fetchConnections = async () => {
@@ -171,7 +173,7 @@ function GenAooi200Page() {
   const handleExportResult = async () => {
     setExportResultLoading(true)
     try {
-      const result = await window.electronAPI.aooi200ExportResult(importedRows)
+      const result = await window.electronAPI.aooi200ExportResult(importedRows, ooba001)
       if (result.canceled) return
       if (result.success) {
         toast.success('处理结果保存成功')
@@ -333,6 +335,15 @@ function GenAooi200Page() {
               </Select>
             </Field>
           )}
+
+          <Field label="参照表编号（导出多Sheet模板用）">
+            <Input
+              value={ooba001}
+              onChange={(e) => setOoba001(e.target.value)}
+              className="w-32 font-mono"
+              maxLength={5}
+            />
+          </Field>
 
           {importError && (
             <Alert variant="destructive">
