@@ -521,13 +521,13 @@ export async function exportAooi200Result(rows: OobxImportRow[], filePath: strin
     });
 
     // 列宽
-    sheet.getColumn(1).width = 18;
-    sheet.getColumn(2).width = 10;
-    sheet.getColumn(3).width = 8;
-    sheet.getColumn(4).width = 10;
+    sheet.getColumn(1).width = 20;
+    sheet.getColumn(2).width = 20;
+    sheet.getColumn(3).width = 20;
+    sheet.getColumn(4).width = 20;
     sheet.getColumn(5).width = 20;
     for (let i = 6; i <= 13; i++) {
-        sheet.getColumn(i).width = 16;
+        sheet.getColumn(i).width = 20;
     }
 
     await workbook.xlsx.writeFile(filePath);
@@ -578,7 +578,7 @@ export async function exportAooi200Result2(
 ): Promise<void> {
     const workbook = new ExcelJS.Workbook();
 
-    const s1 = workbook.addWorksheet('参照表定义');
+    const s1 = workbook.addWorksheet('sheet1');
     const s1Headers = [
         ['字段编号', 'old_docno', 'ooba001', 'ooba002', 'ooba008', 'ooba009', 'ooba010', 'ooba011', 'ooba012', 'ooba013', 'ooba014', 'ooba015', 'ooba016'],
         ['字段说明', '汇入顺序', '参照表编号', '单据别编号', '可用From', '可用To', 'MRP可用From', 'MRP可用To', '成本仓From', '成本仓To', '产品分类-正/负向表列', '理由码-正/负向表列', '备注'],
@@ -609,7 +609,7 @@ export async function exportAooi200Result2(
     // --- 其余 Sheet：仅固定模板 ---
     const templateSheets: { name: string; headers: string[][]; widths: number[] }[] = [
         {
-            name: '字段定义',
+            name: 'sheet2',
             headers: [
                 ['字段编号', 'old_docno', 'oobb001', 'oobb002', 'oobb003', 'oobb004', 'oobb005', 'oobb006', 'oobb007', 'oobb008'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '序号', '字段编号', '默认值', '默认值说明', '可更改', '备注'],
@@ -620,10 +620,10 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', 'S01', 'T001', '1', 'sfajwf013', '1', '手动挑片', 'N', ''],
                 ['(请勿删除)范例2', '2', 'S01', 'T001', '1', 'sfajwf013', '1', '手动挑片', 'N', ''],
             ],
-            widths: [4, 10, 14, 12, 8, 14, 14, 16, 10, 20],
+            widths: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
         },
         {
-            name: '控制组',
+            name: 'sheet3',
             headers: [
                 ['字段编号', 'old_docno', 'oobc001', 'oobc002', 'oobc003', 'oobc004'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '控制组编号', '控制组类型'],
@@ -634,10 +634,10 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', '', '', '', ''],
                 ['(请勿删除)范例2', '2', '', '', '', ''],
             ],
-            widths: [4, 10, 14, 12, 16, 14],
+            widths: [20, 20, 20, 20, 20, 20],
         },
         {
-            name: '生命周期',
+            name: 'sheet4',
             headers: [
                 ['字段编号', 'old_docno', 'oobd001', 'oobd002', 'oobd003', 'oobd004'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '生命周期类型', '生命周期编号'],
@@ -648,10 +648,10 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', '', '', '', ''],
                 ['(请勿删除)范例2', '2', '', '', '', ''],
             ],
-            widths: [4, 10, 14, 12, 16, 16],
+            widths: [20, 20, 20, 20, 20, 20],
         },
         {
-            name: '产品分类',
+            name: 'sheet5',
             headers: [
                 ['字段编号', 'old_docno', 'oobh001', 'oobh002', 'oobh003'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '产品分类'],
@@ -662,10 +662,10 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', '', '', ''],
                 ['(请勿删除)范例2', '2', '', '', ''],
             ],
-            widths: [4, 10, 14, 12, 14],
+            widths: [20, 20, 20, 20, 20],
         },
         {
-            name: '库存标签F',
+            name: 'sheet6',
             headers: [
                 ['字段编号', 'old_docno', 'oobj001', 'oobj002', 'oobj003'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '库存标签编号'],
@@ -676,10 +676,10 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', '', '', ''],
                 ['(请勿删除)范例2', '2', '', '', ''],
             ],
-            widths: [4, 10, 14, 12, 18],
+            widths: [20, 20, 20, 20, 20],
         },
         {
-            name: '库存标签T',
+            name: 'sheet7',
             headers: [
                 ['字段编号', 'old_docno', 'oobk001', 'oobk002', 'oobk003'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '库存标签编号'],
@@ -690,10 +690,10 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', '', '', ''],
                 ['(请勿删除)范例2', '2', '', '', ''],
             ],
-            widths: [4, 10, 14, 12, 18],
+            widths: [20, 20, 20, 20, 20],
         },
         {
-            name: '单身理由码',
+            name: 'sheet8',
             headers: [
                 ['字段编号', 'old_docno', 'oobi001', 'oobi002', 'oobi003'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '单身理由码'],
@@ -704,10 +704,10 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', '', '', ''],
                 ['(请勿删除)范例2', '2', '', '', ''],
             ],
-            widths: [4, 10, 14, 12, 14],
+            widths: [20, 20, 20, 20, 20],
         },
         {
-            name: '参数设定',
+            name: 'sheet9',
             headers: [
                 ['字段编号', 'old_docno', 'ooac001', 'ooac002', 'ooac003', 'ooac004'],
                 ['字段说明', '汇入顺序', '参照表号', '单据别', '参数编号', '参数值'],
@@ -718,7 +718,7 @@ export async function exportAooi200Result2(
                 ['(请勿删除)范例1', '1', 'S01', '1200', 'D-BAS-0102', 'Y'],
                 ['(请勿删除)范例2', '2', 'S01', '1200', 'D-BAS-0102', 'Y'],
             ],
-            widths: [4, 10, 14, 12, 16, 14],
+            widths: [20, 20, 20, 20, 20, 20],
         },
     ];
 
