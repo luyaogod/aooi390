@@ -456,6 +456,29 @@ export async function importAooi200Template(filePath: string, mode: QueryMode = 
     return rows;
 }
 
+// ==================== Sheet 固定模板工具 ====================
+
+const border = { style: 'thin' as const, color: { argb: 'FF000000' } };
+const allBorders = { top: border, bottom: border, left: border, right: border };
+
+/** 写入固定 8 行说明行 + 第 9 行标记行，返回列数 */
+function writeFixedRows(sheet: ExcelJS.Worksheet, rows: string[][]): number {
+    const colCount = rows[0].length;
+    rows.forEach((data, rowIdx) => {
+        const row = sheet.getRow(rowIdx + 1);
+        data.forEach((val, colIdx) => {
+            const cell = row.getCell(colIdx + 1);
+            cell.value = val;
+            cell.border = allBorders;
+        });
+    });
+    // 第 9 行标记
+    const marker = sheet.getRow(9);
+    marker.getCell(1).value = '由此行开始输入→';
+    return colCount;
+}
+
+
 /**
  * 将解析后的 Oobx 导入数据导出为 Excel（A-M 列）
  * 前 8 行为固定说明行（全框线），正式数据从第 9 行开始
@@ -482,7 +505,7 @@ export async function exportAooi200Result(rows: OobxImportRow[], filePath: strin
     // 正式数据从第9行开始
     rows.forEach((row, idx) => {
         const r = sheet.getRow(idx + 9);
-        r.getCell(1).value = '';                    // A: 空
+        r.getCell(1).value = '由此行开始输入→';       // A: 固定提示
         r.getCell(2).value = idx + 1;               // B: 流水号
         r.getCell(3).value = row.oobxstus;          // C
         r.getCell(4).value = row.oobx001;           // D
@@ -511,27 +534,7 @@ export async function exportAooi200Result(rows: OobxImportRow[], filePath: strin
     logger.info('[genAooi200] 处理结果导出成功: %s，共 %d 行', filePath, rows.length);
 }
 
-// ==================== Sheet 固定模板工具 ====================
 
-const border = { style: 'thin' as const, color: { argb: 'FF000000' } };
-const allBorders = { top: border, bottom: border, left: border, right: border };
-
-/** 写入固定 8 行说明行 + 第 9 行标记行，返回列数 */
-function writeFixedRows(sheet: ExcelJS.Worksheet, rows: string[][]): number {
-    const colCount = rows[0].length;
-    rows.forEach((data, rowIdx) => {
-        const row = sheet.getRow(rowIdx + 1);
-        data.forEach((val, colIdx) => {
-            const cell = row.getCell(colIdx + 1);
-            cell.value = val;
-            cell.border = allBorders;
-        });
-    });
-    // 第 9 行标记
-    const marker = sheet.getRow(9);
-    marker.getCell(1).value = '由此行开始输入→';
-    return colCount;
-}
 
 // ==================== Excel 导出（多 Sheet） ====================
 
@@ -563,17 +566,17 @@ export async function exportAooi200Result2(
     // 填充数据（从第9行开始）
     rows.forEach((row, idx) => {
         const r = s1.getRow(idx + 9);
-        r.getCell(1).value = '';             // A: 空
-        r.getCell(2).value = idx + 1;        // B: 流水号
-        r.getCell(3).value = ooba001;        // C: 参照表编号
-        r.getCell(4).value = row.oobx001;    // D: 单据别编号
+        r.getCell(1).value = '由此行开始输入→';   // A: 固定提示
+        r.getCell(2).value = idx + 1;           // B: 流水号
+        r.getCell(3).value = ooba001;           // C: 参照表编号
+        r.getCell(4).value = row.oobx001;       // D: 单据别编号
     });
-    s1.getColumn(1).width = 4;
-    s1.getColumn(2).width = 10;
-    s1.getColumn(3).width = 14;
-    s1.getColumn(4).width = 14;
+    s1.getColumn(1).width = 20;
+    s1.getColumn(2).width = 20;
+    s1.getColumn(3).width = 20;
+    s1.getColumn(4).width = 20;
     for (let i = 5; i <= s1Headers[0].length; i++) {
-        s1.getColumn(i).width = 14;
+        s1.getColumn(i).width = 20;
     }
 
     // --- 其余 Sheet：仅固定模板 ---
