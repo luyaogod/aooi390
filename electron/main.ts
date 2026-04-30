@@ -7,7 +7,7 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-aooi200'
-import { genAooi200, cleanSqliteTables, switchExternalConnection } from './core/gen-aooi200'
+import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result } from './core/gen-aooi200'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
 
@@ -341,6 +341,66 @@ ipcMain.handle('aooi200:gen-data', async (_event, connectionName?: string) => {
   } catch (error) {
     logger.error(error, '[Main] genAooi200 同步失败')
     return { success: false, results: [], error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 导出 AOOI200 导入模板
+ipcMain.handle('aooi200:export-template', async () => {
+  try {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showSaveDialog(win!, {
+      title: '导出导入模板',
+      defaultPath: 'AOOI200导入模板.xlsx',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+    })
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+    await exportAooi200Template(result.filePath)
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 导出模板失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 导入 Excel 模板并解析
+ipcMain.handle('aooi200:import-template', async (_event, mode: string) => {
+  try {
+    const win = BrowserWindow.getFocusedWindow()
+    const fileResult = await dialog.showOpenDialog(win!, {
+      title: '选择导入模板',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+      properties: ['openFile'],
+    })
+    if (fileResult.canceled || fileResult.filePaths.length === 0) {
+      return { success: false, canceled: true }
+    }
+    const rows = await importAooi200Template(fileResult.filePaths[0], mode as 'internal' | 'external')
+    return { success: true, rows }
+  } catch (error) {
+    logger.error(error, '[Main] 导入模板失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 导出解析结果
+ipcMain.handle('aooi200:export-result', async (_event, rows: unknown[]) => {
+  try {
+    const win = BrowserWindow.getFocusedWindow()
+    const result = await dialog.showSaveDialog(win!, {
+      title: '导出处理结果',
+      defaultPath: 'AOOI200处理结果.xlsx',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+    })
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+    await exportAooi200Result(rows as Parameters<typeof exportAooi200Result>[0], result.filePath)
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 导出结果失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 

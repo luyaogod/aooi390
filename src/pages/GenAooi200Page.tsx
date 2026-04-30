@@ -34,6 +34,9 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
+  FileUp,
+  FileDown,
+  Save,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -46,6 +49,13 @@ function GenAooi200Page() {
   const [cleanLoading, setCleanLoading] = useState(false)
   const [genResult, setGenResult] = useState<{ table: string; count: number }[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // 导入/导出相关状态
+  const [queryMode, setQueryMode] = useState<'internal' | 'external'>('internal')
+  const [importLoading, setImportLoading] = useState(false)
+  const [exportResultLoading, setExportResultLoading] = useState(false)
+  const [importedRows, setImportedRows] = useState<ImportRow[]>([])
+  const [importError, setImportError] = useState<string | null>(null)
 
   const fetchConnections = async () => {
     setConnectionsLoading(true)
@@ -109,6 +119,60 @@ function GenAooi200Page() {
       toast.error(err instanceof Error ? err.message : String(err))
     } finally {
       setCleanLoading(false)
+    }
+  }
+
+  const handleExportTemplate = async () => {
+    try {
+      const result = await window.electronAPI.aooi200ExportTemplate()
+      if (result.canceled) return
+      if (result.success) {
+        toast.success('模板导出成功')
+      } else {
+        toast.error(result.error ?? '导出失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const handleImportTemplate = async () => {
+    setImportLoading(true)
+    setImportedRows([])
+    setImportError(null)
+    try {
+      const result = await window.electronAPI.aooi200ImportTemplate(queryMode)
+      if (result.canceled) return
+      if (result.success && result.rows) {
+        setImportedRows(result.rows)
+        toast.success(`导入完成，共 ${result.rows.length} 条记录`)
+      } else {
+        setImportError(result.error ?? '导入失败')
+        toast.error(result.error ?? '导入失败')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setImportError(msg)
+      toast.error(msg)
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  const handleExportResult = async () => {
+    setExportResultLoading(true)
+    try {
+      const result = await window.electronAPI.aooi200ExportResult(importedRows)
+      if (result.canceled) return
+      if (result.success) {
+        toast.success('处理结果保存成功')
+      } else {
+        toast.error(result.error ?? '保存失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setExportResultLoading(false)
     }
   }
 
@@ -215,6 +279,114 @@ function GenAooi200Page() {
               : <Trash2 className="size-3.5" />
             }
             {cleanLoading ? '清空中...' : '清空本地数据'}
+          </Button>
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>导入单据别</CardTitle>
+          <CardDescription>导出模板填写后导入，通过作业编号自动查找单据性质和模组</CardDescription>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-4">
+          <Field label="查询模式">
+            <Select value={queryMode} onValueChange={(v) => setQueryMode(v as 'internal' | 'external')}>
+              <SelectTrigger className="w-72">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="internal">内部 SQLite（已同步数据）</SelectItem>
+                  <SelectItem value="external">外部数据库（直连）</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+
+          {importError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="size-4" />
+              <AlertTitle>导入失败</AlertTitle>
+              <AlertDescription>{importError}</AlertDescription>
+            </Alert>
+          )}
+
+          {importedRows.length > 0 && (
+            <>
+              <Alert variant="default">
+                <CheckCircle2 className="size-4" />
+                <AlertTitle>导入完成</AlertTitle>
+                <AlertDescription>共 {importedRows.length} 条记录</AlertDescription>
+              </Alert>
+
+              <div className="max-h-80 overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>单据别</TableHead>
+                      <TableHead>名称</TableHead>
+                      <TableHead>作业编号</TableHead>
+                      <TableHead>模组别</TableHead>
+                      <TableHead>单据性质</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importedRows.map((row, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="font-mono">{row.oobx001}</TableCell>
+                        <TableCell>{row.oobxl003}</TableCell>
+                        <TableCell className="font-mono">{row.oobx004}</TableCell>
+                        <TableCell>{row.oobx002}</TableCell>
+                        <TableCell>{row.oobx003}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+
+        <CardFooter className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportTemplate}
+            className="gap-1.5"
+          >
+            <FileDown className="size-3.5" />
+            导出模板
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleImportTemplate}
+            disabled={importLoading}
+            className="gap-1.5"
+          >
+            {importLoading
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <FileUp className="size-3.5" />
+            }
+            {importLoading ? '解析中...' : '导入'}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportResult}
+            disabled={importedRows.length === 0 || exportResultLoading}
+            className="gap-1.5"
+          >
+            {exportResultLoading
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <Save className="size-3.5" />
+            }
+            {exportResultLoading ? '保存中...' : '保存结果'}
           </Button>
         </CardFooter>
       </Card>

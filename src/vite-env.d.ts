@@ -102,6 +102,9 @@ interface ElectronAPI {
   aooi200SwitchConnection: (connectionName: string) => Promise<{ success: boolean; error?: string }>
   aooi200CleanSqlite: () => Promise<{ success: boolean; error?: string }>
   aooi200GenData: (connectionName?: string) => Promise<{ success: boolean; results: { table: string; count: number }[]; error?: string }>
+  aooi200ExportTemplate: () => Promise<{ success: boolean; canceled?: boolean; error?: string }>
+  aooi200ImportTemplate: (mode: string) => Promise<{ success: boolean; canceled?: boolean; rows?: ImportRow[]; error?: string }>
+  aooi200ExportResult: (rows: unknown[]) => Promise<{ success: boolean; canceled?: boolean; error?: string }>
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>
@@ -155,6 +158,21 @@ declare global {
     gzszl005: string
     gzszl006: string
     gzszl007: string
+  }
+
+  interface ImportRow {
+    oobxent: number
+    oobx001: string
+    oobx002: string | null
+    oobx003: string | null
+    oobx004: string | null
+    oobx005: string | null
+    oobx006: string | null
+    oobx007: number | null
+    oobx008: string | null
+    oobx009: string | null
+    oobxstus: string | null
+    oobxl003: string
   }
 }
 

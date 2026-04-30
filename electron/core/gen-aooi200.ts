@@ -1,6 +1,8 @@
+import ExcelJS from 'exceljs';
 import { externalDB, appDB } from '../db/clients';
 import logger from '../utils/logger';
 import { dbConnectionManager } from '../config/db-connections';
+import { Oobx } from '@prisma/client';
 
 /** 表名 → Prisma 模型名映射（注意：Prisma 模型名首字母大写） */
 const tableModelMap: Record<string, string> = {
@@ -229,6 +231,36 @@ export async function switchExternalConnection(connectionName: string): Promise<
     logger.info('[genAooi200] 已切换到外部数据库连接: %s', connectionName);
 }
 
+/**
+ * 导出 AOOI200 导入模板 Excel 文件
+ * 第一行 A-C 列：单据别、名称、作业编号，黄色底纹加粗
+ */
+export async function exportAooi200Template(filePath: string): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Sheet1');
+
+    const headers = ['单据别', '名称', '作业编号'];
+    const headerRow = sheet.getRow(1);
+
+    headers.forEach((header, index) => {
+        const cell = headerRow.getCell(index + 1);
+        cell.value = header;
+        cell.font = { bold: true };
+        cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFFF00' },
+        };
+    });
+
+    sheet.getColumn(1).width = 15;
+    sheet.getColumn(2).width = 20;
+    sheet.getColumn(3).width = 15;
+
+    await workbook.xlsx.writeFile(filePath);
+    logger.info('[genAooi200] 模板导出成功: %s', filePath);
+}
+
 /** 确保外部数据库已连接 */
 async function ensureConnected(connectionName?: string): Promise<void> {
     if (connectionName) {
@@ -254,4 +286,223 @@ async function ensureConnected(connectionName?: string): Promise<void> {
     );
 
     logger.info('[genAooi200] 外部数据库已连接: %s', defaultConn.name);
+}
+
+
+// ==================== Aooi200QueryService ====================
+
+/** 查询模式：external-外部数据库 | internal-内部 SQLite */
+export type QueryMode = 'external' | 'internal';
+
+/**
+ * AOOI200 数据查询服务
+ * 支持双模式：从外部数据库（Oracle/Kingbase）查询，或从内部 SQLite 查询
+ */
+export class Aooi200QueryService {
+    private mode: QueryMode;
+
+    constructor(mode: QueryMode = 'internal') {
+        this.mode = mode;
+    }
+
+    /** 切换查询模式 */
+    setMode(mode: QueryMode): void {
+        this.mode = mode;
+    }
+
+    /** 获取当前查询模式 */
+    getMode(): QueryMode {
+        return this.mode;
+    }
+
+    /** 执行 SQL 查询：根据模式路由到外部 DB 或内部 SQLite */
+    private async query(sql: string): Promise<Record<string, unknown>[]> {
+        if (this.mode === 'external') {
+            const result = await externalDB.query(sql);
+            return result.rows as Record<string, unknown>[];
+        } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return (appDB.getPrisma() as any).$queryRawUnsafe(sql) as Promise<Record<string, unknown>[]>;
+        }
+    }
+
+    /**
+     * 根据作业编号查询单据性质
+     * @param gzzz001 作业编号
+     * @returns 单据性质 (gzzz006)
+     */
+    async gzzz006Get(gzzz001: string): Promise<string> {
+        logger.debug({ mode: this.mode, gzzz001 }, '[Aooi200Query] gzzz006Get: 查询作业编号对应的单据性质');
+        const sql = `
+            SELECT DISTINCT gzzz006
+            FROM gzzz_t
+            LEFT OUTER JOIN gzzal_t ON gzzz001 = gzzal001 AND gzzal002 = 'zh_CN'
+            , gzza_t
+            WHERE 1=1
+              AND gzzz002 = gzza001
+              AND gzza002 IN ('T','Q')
+              AND gzzzstus = 'Y'
+              AND gzzz001 = '${gzzz001}'
+            ORDER BY gzzz001, gzzal003
+        `;
+        logger.debug({ sql }, '[Aooi200Query] gzzz006Get: 查询 SQL');
+        const rows = await this.query(sql);
+        return rows.length > 0 ? String(rows[0]['gzzz006'] ?? '') : '';
+    }
+
+    /**
+     * 根据单据性质查询模组
+     * @param gzcb002 单据性质
+     * @returns 模组 (gzcb003)
+     */
+    async gzcb004Get(gzcb002: string): Promise<string> {
+        logger.debug({ mode: this.mode, gzcb002 }, '[Aooi200Query] gzcb004Get: 查询单据性质对应的模组');
+        const sql = `
+            SELECT DISTINCT gzcb003
+            FROM gzcb_t
+            LEFT OUTER JOIN gzcbl_t ON gzcb001 = gzcbl001 AND gzcb002 = gzcbl002 AND gzcbl003 = 'zh_CN'
+            WHERE 1=1
+              AND gzcb001 = '24'
+              AND gzcb002 = '${gzcb002}'
+            ORDER BY gzcb002
+        `;
+        logger.debug({ sql }, '[Aooi200Query] gzcb004Get: 查询 SQL');
+        const rows = await this.query(sql);
+        return rows.length > 0 ? String(rows[0]['gzcb003'] ?? '') : '';
+    }
+
+    /**
+     * 校验作业编号是否存在且有效
+     * @param gzzz001 作业编号
+     * @returns 存在且有效则返回 true
+     */
+    async gzzz001Chk(gzzz001: string): Promise<boolean> {
+        logger.debug({ mode: this.mode, gzzz001 }, '[Aooi200Query] gzzz001Chk: 校验作业编号是否存在');
+        const sql = `
+            SELECT COUNT(*) AS cnt
+            FROM gzzz_t
+            LEFT OUTER JOIN gzzal_t ON gzzz001 = gzzal001 AND gzzal002 = 'zh_CN'
+            , gzza_t
+            WHERE 1=1
+              AND gzzz002 = gzza001
+              AND gzza002 IN ('T','Q')
+              AND gzzz001 = '${gzzz001}'
+        `;
+        logger.debug({ sql }, '[Aooi200Query] gzzz001Chk: 查询 SQL');
+        const rows = await this.query(sql);
+        const count = Number(rows[0]?.cnt ?? 0);
+        logger.debug({ count }, '[Aooi200Query] gzzz001Chk: 查询结果');
+        return count > 0;
+    }
+}
+
+// ==================== Excel 导入 ====================
+
+/** Excel 导入行：Oobx 字段 + oobxl003（名称，对应 Oobxl 表） */
+export type OobxImportRow = Oobx & { oobxl003: string };
+
+/**
+ * 从 Excel 模板读取用户导入的数据，转换为 Oobx 行
+ * A列→oobx001, B列→oobxl003, C列→oobx004
+ * oobx003 通过 gzzz006Get(oobx004) 获取，oobx002 通过 gzcb004Get(oobx003) 获取
+ * @param filePath Excel 文件路径
+ * @param mode     查询模式（默认 internal，从内部 SQLite 查）
+ * @returns Oobx 导入行数组
+ */
+export async function importAooi200Template(filePath: string, mode: QueryMode = 'internal'): Promise<OobxImportRow[]> {
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const sheet = workbook.getWorksheet(1);
+    if (!sheet) {
+        throw new Error('Excel 文件中未找到工作表');
+    }
+
+    // 先收集原始数据（eachRow 同步，但后续查库是异步的）
+    const rawRows: { oobx001: string; oobxl003: string; oobx004: string }[] = [];
+    sheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // 跳过表头
+        const oobx001 = String(row.getCell(1).value ?? '').trim();
+        if (!oobx001) return; // 跳过空行
+        rawRows.push({
+            oobx001,
+            oobxl003: String(row.getCell(2).value ?? '').trim(),
+            oobx004: String(row.getCell(3).value ?? '').trim(),
+        });
+    });
+
+    logger.info({ count: rawRows.length }, '[genAooi200] 从 Excel 读取到 %d 行数据', rawRows.length);
+
+    // 异步查库填充 oobx003、oobx002
+    const svc = new Aooi200QueryService(mode);
+    const rows: OobxImportRow[] = [];
+
+    for (const raw of rawRows) {
+        const oobx003 = raw.oobx004 ? await svc.gzzz006Get(raw.oobx004) : '';
+        const oobx002 = oobx003 ? await svc.gzcb004Get(oobx003) : '';
+
+        rows.push({
+            oobxent: 0,
+            oobx001: raw.oobx001,
+            oobx002: oobx002 || null,
+            oobx003: oobx003 || null,
+            oobx004: raw.oobx004 || null,
+            oobx005: 'Y',
+            oobx006: '6',
+            oobxstus: 'Y',
+            oobxl003: raw.oobxl003,
+        } as OobxImportRow);
+    }
+
+    logger.info({ count: rows.length }, '[genAooi200] Excel 导入解析完成，共 %d 行', rows.length);
+    return rows;
+}
+
+/**
+ * 将解析后的 Oobx 导入数据导出为 Excel（A-M 列）
+ * A:空 B:流水号(从1开始) C:oobxstus D:oobx001 E:oobxl003 F-M:oobx002-oobx009
+ * @param rows     Oobx 导入行数组
+ * @param filePath 输出文件路径
+ */
+export async function exportAooi200Result(rows: OobxImportRow[], filePath: string): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Sheet1');
+
+    // 表头
+    const headers = ['', '流水号', '状态', '单据别', '名称', '模组别', '单据性质', '对应作业编号', '自动编码否', '期别码', '所剩流水号长度', '编码结果', '于aoor700揭露'];
+    const headerRow = sheet.getRow(1);
+    headers.forEach((h, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h;
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    });
+
+    // 数据行
+    rows.forEach((row, idx) => {
+        const r = sheet.getRow(idx + 2);
+        r.getCell(1).value = '';                    // A: 空
+        r.getCell(2).value = idx + 1;               // B: 流水号
+        r.getCell(3).value = row.oobxstus;          // C
+        r.getCell(4).value = row.oobx001;           // D
+        r.getCell(5).value = row.oobxl003;          // E
+        r.getCell(6).value = row.oobx002;           // F
+        r.getCell(7).value = row.oobx003;           // G
+        r.getCell(8).value = row.oobx004;           // H
+        r.getCell(9).value = row.oobx005;           // I
+        r.getCell(10).value = row.oobx006;          // J
+        r.getCell(11).value = row.oobx007;          // K
+        r.getCell(12).value = row.oobx008;          // L
+        r.getCell(13).value = row.oobx009;          // M
+    });
+
+    // 列宽
+    sheet.getColumn(1).width = 4;
+    sheet.getColumn(2).width = 8;
+    sheet.getColumn(3).width = 6;
+    for (let i = 4; i <= 13; i++) {
+        sheet.getColumn(i).width = 16;
+    }
+
+    await workbook.xlsx.writeFile(filePath);
+    logger.info('[genAooi200] 处理结果导出成功: %s，共 %d 行', filePath, rows.length);
 }
