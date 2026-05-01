@@ -108,8 +108,8 @@ interface ElectronAPI {
   aooi200ExportConfig: () => Promise<{ success: boolean; canceled?: boolean; results?: { table: string; count: number }[]; error?: string }>
   aooi200ImportConfig: () => Promise<{ success: boolean; canceled?: boolean; results?: { table: string; count: number }[]; error?: string }>
   aooi200QueryEnt: () => Promise<{ success: boolean; rows: { gzou001: string; gzou003: string }[]; error?: string }>
-  aooi200QueryWfOobx: (ent: number) => Promise<{ success: boolean; rows: WfOobxRow[]; error?: string }>
-  aooi200ReplaceOoblWf: (ent: number, rows: WfOobxRow[]) => Promise<{ success: boolean; count?: number; error?: string }>
+  aooi200QueryWfOobx: (schema: string, ent: number) => Promise<{ success: boolean; rows: WfOobxRow[]; error?: string }>
+  aooi200ReplaceOoblWf: (schema: string, ent: number, rows: WfOobxRow[]) => Promise<{ success: boolean; count?: number; error?: string }>
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>

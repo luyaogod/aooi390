@@ -35,8 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // IC行业单据别批次设置MULTI
   aooi200QueryEnt: () => ipcRenderer.invoke('aooi200:query-ent'),
-  aooi200QueryWfOobx: (ent: number) => ipcRenderer.invoke('aooi200:query-wf-oobx', ent),
-  aooi200ReplaceOoblWf: (ent: number, rows: unknown[]) => ipcRenderer.invoke('aooi200:replace-oobl-wf', ent, rows),
+  aooi200QueryWfOobx: (schema: string, ent: number) => ipcRenderer.invoke('aooi200:query-wf-oobx', schema, ent),
+  aooi200ReplaceOoblWf: (schema: string, ent: number, rows: unknown[]) => ipcRenderer.invoke('aooi200:replace-oobl-wf', schema, ent, rows),
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
     ipcRenderer.on('aooi200:validation-progress', listener)

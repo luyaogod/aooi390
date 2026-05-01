@@ -466,9 +466,9 @@ ipcMain.handle('aooi200:query-ent', async () => {
 })
 
 // IPC: 查询 wf Oobx 预览数据
-ipcMain.handle('aooi200:query-wf-oobx', async (_event, ent: number) => {
+ipcMain.handle('aooi200:query-wf-oobx', async (_event, schema: string, ent: number) => {
   try {
-    const rows = await queryWfOobxData(ent)
+    const rows = await queryWfOobxData(schema, ent)
     return { success: true, rows }
   } catch (error) {
     logger.error(error, '[Main] 查询 wf Oobx 数据失败')
@@ -477,9 +477,9 @@ ipcMain.handle('aooi200:query-wf-oobx', async (_event, ent: number) => {
 })
 
 // IPC: 执行 oobl wf 数据替换（事务）
-ipcMain.handle('aooi200:replace-oobl-wf', async (_event, ent: number, rows: unknown[]) => {
+ipcMain.handle('aooi200:replace-oobl-wf', async (_event, schema: string, ent: number, rows: unknown[]) => {
   try {
-    const count = await replaceOoblWfData(ent, rows as Parameters<typeof replaceOoblWfData>[1])
+    const count = await replaceOoblWfData(schema, ent, rows as Parameters<typeof replaceOoblWfData>[2])
     return { success: true, count }
   } catch (error) {
     logger.error(error, '[Main] 执行 oobl wf 替换失败')

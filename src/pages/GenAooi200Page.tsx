@@ -268,8 +268,10 @@ function GenAooi200Page() {
     }
   }
 
+  const selectedSchema = entList.find(e => e.gzou001 === selectedEnt)?.gzou003 ?? ''
+
   const handleWfPreview = async () => {
-    if (!selectedEnt) {
+    if (!selectedEnt || !selectedSchema) {
       toast.error('请先选择企业')
       return
     }
@@ -278,7 +280,7 @@ function GenAooi200Page() {
     setWfError(null)
     setWfResult(null)
     try {
-      const result = await window.electronAPI.aooi200QueryWfOobx(Number(selectedEnt))
+      const result = await window.electronAPI.aooi200QueryWfOobx(selectedSchema, Number(selectedEnt))
       if (result.success) {
         setWfPreviewRows(result.rows)
         toast.success(`查询完成，共 ${result.rows.length} 条记录`)
@@ -296,12 +298,12 @@ function GenAooi200Page() {
   }
 
   const handleWfExecute = async () => {
-    if (!selectedEnt || wfPreviewRows.length === 0) return
+    if (!selectedEnt || !selectedSchema || wfPreviewRows.length === 0) return
     setWfExecuteLoading(true)
     setWfError(null)
     setWfResult(null)
     try {
-      const result = await window.electronAPI.aooi200ReplaceOoblWf(Number(selectedEnt), wfPreviewRows)
+      const result = await window.electronAPI.aooi200ReplaceOoblWf(selectedSchema, Number(selectedEnt), wfPreviewRows)
       if (result.success) {
         setWfResult(result.count ?? 0)
         toast.success(`执行更新完成，共插入 ${result.count} 条记录`)
