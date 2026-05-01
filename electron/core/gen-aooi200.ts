@@ -947,6 +947,7 @@ const docConfigTables: DocConfigTable[] = [
     { table: 'oobi_t', entCol: 'oobient', refCol: 'oobi001', docCol: 'oobi002' },
     { table: 'oobj_t', entCol: 'oobjent', refCol: 'oobj001', docCol: 'oobj002' },
     { table: 'oobk_t', entCol: 'oobkent', refCol: 'oobk001', docCol: 'oobk002' },
+    { table: 'ooac_t', entCol: 'ooacent', refCol: 'ooac001', docCol: 'ooac002' },
 ];
 
 /** 单条单据别参照表查询结果 */

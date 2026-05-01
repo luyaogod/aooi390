@@ -985,7 +985,7 @@ function GenAooi200Page() {
                     </TableHeader>
                     <TableBody>
                       {matchedList.map(r => (
-                        <TableRow key={r.ooba002} className={selectedOoba002.has(r.ooba002) ? '' : 'opacity-50'}>
+                        <TableRow key={r.ooba002} className={(r.oobxl003Ent1 !== r.oobxl003Ent2 ? 'bg-yellow-50 ' : '') + (selectedOoba002.has(r.ooba002) ? '' : 'opacity-50')}>
                           <TableCell><input type="checkbox" checked={selectedOoba002.has(r.ooba002)} onChange={() => toggleOoba002(r.ooba002)} /></TableCell>
                           <TableCell className="font-mono">{r.ooba002}</TableCell>
                           <TableCell>{r.oobxl003Ent1}</TableCell>
