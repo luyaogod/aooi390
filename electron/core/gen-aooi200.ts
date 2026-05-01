@@ -898,7 +898,7 @@ export async function replaceOoblWfData(schema: string, ent: number, rows: WfOob
 
     // 在事务中执行 DELETE + INSERT，报错时自动回滚
     return externalTransaction(async (exec) => {
-        const deleteSql = `DELETE FROM ${schema}.oobl_t WHERE oobxent = ${ent} AND oobl001 IN (${inClause})`;
+        const deleteSql = `DELETE FROM ${schema}.oobl_t WHERE ooblent = ${ent} AND oobl001 IN (${inClause})`;
         logger.debug({ deleteSql, schema, ent, oobx001Count: oobx001List.length }, '[genAooi200] replaceOoblWfData: 删除旧数据');
         await exec(deleteSql);
 
@@ -908,7 +908,7 @@ export async function replaceOoblWfData(schema: string, ent: number, rows: WfOob
             const oobx004Clean = oobx004.replace(/_wf$/, '');
 
             for (const val of [oobx004, oobx004Clean]) {
-                const insertSql = `INSERT INTO ${schema}.oobl_t (oobxl001, oobxl002, oobxl003) VALUES ('${esc(String(ent))}', '${esc(row.oobx001)}', '${esc(val)}')`;
+                const insertSql = `INSERT INTO ${schema}.oobl_t (ooblent, oobl001, oobl002) VALUES ('${esc(String(ent))}', '${esc(row.oobx001)}', '${esc(val)}')`;
                 await exec(insertSql);
                 insertedCount++;
             }
