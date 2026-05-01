@@ -111,11 +111,11 @@ interface ElectronAPI {
   aooi200QueryWfOobx: (schema: string, ent: number) => Promise<{ success: boolean; rows: WfOobxRow[]; error?: string }>
   aooi200ReplaceOoblWf: (schema: string, ent: number, rows: WfOobxRow[]) => Promise<{ success: boolean; count?: number; error?: string }>
   aooi200QueryOoba001List: (schema: string, ent: number) => Promise<{ success: boolean; list: string[]; error?: string }>
-  aooi200CompareOobaRef: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) =>
+  aooi200CompareOobaRef: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) =>
     Promise<{ success: boolean; matched: MatchedOobaRow[]; onlyEnt1: OobaRefRow[]; onlyEnt2: OobaRefRow[]; error?: string }>
-  aooi200ValidateDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+  aooi200ValidateDocConfig: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
     Promise<{ success: boolean; errors: ValidateError[]; error?: string }>
-  aooi200CopyDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+  aooi200CopyDocConfig: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
     Promise<{ success: boolean; timestamp: number; results: { table: string; deleted: number; inserted: number }[]; errors: ValidateError[]; error?: string }>
   aooi200RestoreFromBackup: (schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) =>
     Promise<{ success: boolean; restored: string[]; error?: string }>

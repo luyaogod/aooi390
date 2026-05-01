@@ -488,9 +488,9 @@ ipcMain.handle('aooi200:query-ooba001-list', async (_event, schema: string, ent:
 })
 
 // IPC: 比较两个 ENT 的单据别参照表
-ipcMain.handle('aooi200:compare-ooba-ref', async (_event, schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) => {
+ipcMain.handle('aooi200:compare-ooba-ref', async (_event, schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) => {
   try {
-    const result = await compareOobaRef(schema, ent1, ent2, ooba001From, ooba001To)
+    const result = await compareOobaRef(schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To)
     return { success: true, ...result }
   } catch (error) {
     logger.error(error, '[Main] 比较单据别参照表失败')
@@ -499,9 +499,9 @@ ipcMain.handle('aooi200:compare-ooba-ref', async (_event, schema: string, ent1: 
 })
 
 // IPC: 校验单据别配置迁移
-ipcMain.handle('aooi200:validate-doc-config', async (_event, schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) => {
+ipcMain.handle('aooi200:validate-doc-config', async (_event, schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) => {
   try {
-    const errors = await validateDocConfig(schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode as 'collect' | 'failFast')
+    const errors = await validateDocConfig(schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode as 'collect' | 'failFast')
     return { success: true, errors }
   } catch (error) {
     logger.error(error, '[Main] 校验单据别配置迁移失败')
@@ -510,9 +510,9 @@ ipcMain.handle('aooi200:validate-doc-config', async (_event, schema: string, ent
 })
 
 // IPC: 复制单据别配置（含备份→校验→迁移）
-ipcMain.handle('aooi200:copy-doc-config', async (_event, schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) => {
+ipcMain.handle('aooi200:copy-doc-config', async (_event, schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) => {
   try {
-    const result = await copyDocConfig(schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode as 'collect' | 'failFast')
+    const result = await copyDocConfig(schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode as 'collect' | 'failFast')
     return { success: true, ...result }
   } catch (error) {
     logger.error(error, '[Main] 复制单据别配置失败')

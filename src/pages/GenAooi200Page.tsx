@@ -349,10 +349,6 @@ function GenAooi200Page() {
       toast.error('未找到对应企业的 schema，请先加载企业列表')
       return
     }
-    if (sourceSchema !== targetSchema) {
-      toast.error('来源和目标企业必须属于同一个 schema')
-      return
-    }
     setCompareLoading(true)
     setCompareResult(null)
     setSelectedOoba002(new Set())
@@ -361,7 +357,7 @@ function GenAooi200Page() {
     setSyncError(null)
     try {
       const result = await window.electronAPI.aooi200CompareOobaRef(
-        sourceSchema, Number(sourceEnt), Number(targetEnt), sourceOoba001, targetOoba001,
+        sourceSchema, targetSchema, Number(sourceEnt), Number(targetEnt), sourceOoba001, targetOoba001,
       )
       if (result.success) {
         setCompareResult({ matched: result.matched, onlyEnt1: result.onlyEnt1, onlyEnt2: result.onlyEnt2 })
@@ -389,7 +385,7 @@ function GenAooi200Page() {
     setValidateErrors([])
     try {
       const result = await window.electronAPI.aooi200ValidateDocConfig(
-        sourceSchema, Number(sourceEnt), Number(targetEnt),
+        sourceSchema, targetSchema, Number(sourceEnt), Number(targetEnt),
         sourceOoba001, targetOoba001,
         checkedList.map(r => r.ooba002), 'collect',
       )
@@ -420,7 +416,7 @@ function GenAooi200Page() {
     setSyncError(null)
     try {
       const result = await window.electronAPI.aooi200CopyDocConfig(
-        sourceSchema, Number(sourceEnt), Number(targetEnt),
+        sourceSchema, targetSchema, Number(sourceEnt), Number(targetEnt),
         sourceOoba001, targetOoba001,
         checkedList.map(r => r.ooba002), 'collect',
       )

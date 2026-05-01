@@ -40,12 +40,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 单据别参照表比对 & 配置迁移
   aooi200QueryOoba001List: (schema: string, ent: number) => ipcRenderer.invoke('aooi200:query-ooba001-list', schema, ent),
-  aooi200CompareOobaRef: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) =>
-    ipcRenderer.invoke('aooi200:compare-ooba-ref', schema, ent1, ent2, ooba001From, ooba001To),
-  aooi200ValidateDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
-    ipcRenderer.invoke('aooi200:validate-doc-config', schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
-  aooi200CopyDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
-    ipcRenderer.invoke('aooi200:copy-doc-config', schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
+  aooi200CompareOobaRef: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) =>
+    ipcRenderer.invoke('aooi200:compare-ooba-ref', schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To),
+  aooi200ValidateDocConfig: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+    ipcRenderer.invoke('aooi200:validate-doc-config', schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
+  aooi200CopyDocConfig: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+    ipcRenderer.invoke('aooi200:copy-doc-config', schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
   aooi200RestoreFromBackup: (schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) =>
     ipcRenderer.invoke('aooi200:restore-from-backup', schema, timestamp, ent2, ooba001, ooba002List),
   aooi200CleanBackups: (schema: string, timestamp?: number) =>

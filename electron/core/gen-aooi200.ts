@@ -1010,16 +1010,18 @@ export async function queryOobaByRef(
 /**
  * 比对两个 ENT 在不同参照表下的单据别数据
  * 按 ooba002,oobx002,oobx003,oobx004 完全匹配进行关联
+ * @param schemaFrom  源 schema（ent1 所在的）
+ * @param schemaTo    目标 schema（ent2 所在的）
  * @param ooba001From 源参照表编号（ent1 中的）
  * @param ooba001To   目标参照表编号（ent2 中的）
  * @returns 匹配行（含双方 oobxl003）、仅 ent1 的行、仅 ent2 的行
  */
 export async function compareOobaRef(
-    schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string,
+    schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string,
 ): Promise<{ matched: MatchedOobaRow[]; onlyEnt1: OobaRefRow[]; onlyEnt2: OobaRefRow[] }> {
     const [rows1, rows2] = await Promise.all([
-        queryOobaByRef(schema, ent1, ooba001From),
-        queryOobaByRef(schema, ent2, ooba001To),
+        queryOobaByRef(schemaFrom, ent1, ooba001From),
+        queryOobaByRef(schemaTo, ent2, ooba001To),
     ]);
 
     const map2 = new Map<string, OobaRefRow>();
@@ -1056,7 +1058,7 @@ export async function compareOobaRef(
     const onlyEnt2 = rows2.filter(r => !matchedKeys.has(r.ooba002));
 
     logger.info({
-        schema, ent1, ent2, ooba001From, ooba001To,
+        schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To,
         matched: matched.length, onlyEnt1: onlyEnt1.length, onlyEnt2: onlyEnt2.length,
     }, '[genAooi200] compareOobaRef: 比对完成');
 
@@ -1087,8 +1089,9 @@ function pushError(errors: ValidateError[], err: ValidateError | null, mode: Val
 
 /**
  * 校验 ent1 的单据别配置能否迁移到 ent2（仅校验，不修改数据）
- * 查询 ent1(ooba001From) 全部源数据，在 ent2(ooba001To) 环境中逐表逐行校验关键字段
- * @param schema       数据库 schema
+ * 从 schemaFrom 查询 ent1(ooba001From) 源数据，在 schemaTo 的 ent2(ooba001To) 环境中逐表逐行校验
+ * @param schemaFrom   源数据库 schema
+ * @param schemaTo     目标数据库 schema
  * @param ent1         源企业编号
  * @param ent2         目标企业编号
  * @param ooba001From  源参照表编号
@@ -1098,7 +1101,7 @@ function pushError(errors: ValidateError[], err: ValidateError | null, mode: Val
  * @returns 校验错误列表（空数组表示全部通过）
  */
 export async function validateDocConfig(
-    schema: string, ent1: number, ent2: number,
+    schemaFrom: string, schemaTo: string, ent1: number, ent2: number,
     ooba001From: string, ooba001To: string, ooba002List: string[],
     mode: ValidateMode = 'collect',
 ): Promise<ValidateError[]> {
@@ -1115,7 +1118,7 @@ export async function validateDocConfig(
     const errors: ValidateError[] = [];
 
     for (const { table, entCol, refCol, docCol } of docConfigTables) {
-        const selectSql = `SELECT * FROM ${schema}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
+        const selectSql = `SELECT * FROM ${schemaFrom}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
         const srcResult = await externalDB.query(selectSql);
         const srcRows = srcResult.rows as Record<string, unknown>[];
 
@@ -1124,29 +1127,29 @@ export async function validateDocConfig(
         for (const row of srcRows) {
             switch (table) {
                 case 'ooba_t':
-                    if (pushError(errors, await ooba001Chk(ooba001To, ent2Str, schema), mode)) return errors;
-                    if (pushError(errors, await ooba002Chk(String(row['ooba002'] ?? ''), ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await ooba001Chk(ooba001To, ent2Str, schemaTo), mode)) return errors;
+                    if (pushError(errors, await ooba002Chk(String(row['ooba002'] ?? ''), ent2Str, schemaTo), mode)) return errors;
                     break;
                 case 'oobb_t':
-                    if (pushError(errors, await oobb004Chk(String(row['oobb004'] ?? ''), String(row['oobb002'] ?? ''), ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await oobb004Chk(String(row['oobb004'] ?? ''), String(row['oobb002'] ?? ''), ent2Str, schemaTo), mode)) return errors;
                     break;
                 case 'oobc_t':
-                    if (pushError(errors, await oobc003Chk(String(row['oobc003'] ?? ''), String(row['oobc004'] ?? ''), ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await oobc003Chk(String(row['oobc003'] ?? ''), String(row['oobc004'] ?? ''), ent2Str, schemaTo), mode)) return errors;
                     break;
                 case 'oobd_t':
-                    if (pushError(errors, await oobd004Chk(String(row['oobd003'] ?? ''), String(row['oobd004'] ?? ''), ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await oobd004Chk(String(row['oobd003'] ?? ''), String(row['oobd004'] ?? ''), ent2Str, schemaTo), mode)) return errors;
                     break;
                 case 'oobh_t':
-                    if (pushError(errors, await oobh003Chk(String(row['oobh003'] ?? ''), ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await oobh003Chk(String(row['oobh003'] ?? ''), ent2Str, schemaTo), mode)) return errors;
                     break;
                 case 'oobi_t':
-                    if (pushError(errors, await oobi003Chk(String(row['oobi002'] ?? ''), String(row['oobi003'] ?? ''), ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await oobi003Chk(String(row['oobi002'] ?? ''), String(row['oobi003'] ?? ''), ent2Str, schemaTo), mode)) return errors;
                     break;
                 case 'oobj_t':
-                    if (pushError(errors, await oobj003Chk(String(row['oobj003'] ?? ''), ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await oobj003Chk(String(row['oobj003'] ?? ''), ent2Str, schemaTo), mode)) return errors;
                     break;
                 case 'oobk_t':
-                    if (pushError(errors, await oobj003Chk(String(row['oobk003'] ?? ''), ent2Str, schema, 'oobk_t', 'oobk003', '库存标签编号T'), mode)) return errors;
+                    if (pushError(errors, await oobj003Chk(String(row['oobk003'] ?? ''), ent2Str, schemaTo, 'oobk_t', 'oobk003', '库存标签编号T'), mode)) return errors;
                     break;
             }
         }
@@ -1154,18 +1157,19 @@ export async function validateDocConfig(
         if (mode === 'failFast' && errors.length > 0) return errors;
     }
 
-    logger.info({ schema, ent1, ent2, ooba001From, ooba001To, errorCount: errors.length }, '[genAooi200] validateDocConfig: 校验完成');
+    logger.info({ schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, errorCount: errors.length }, '[genAooi200] validateDocConfig: 校验完成');
     return errors;
 }
 
 /**
  * 将 ent1 指定参照表的单据别配置迁移到 ent2 指定参照表（含备份→校验→删除→插入）
  *
- * 迁移本质：从 ent1.ooba001From 查数据，替换 ent→ent2 + 参照表→ooba001To 后插入 ent2
- * 1. 先为 ent2 在 ooba001To 下的现有数据创建备份表（DDL，Oracle 下隐式提交）
- * 2. 查询 ent1(ooba001From) 全部源数据，在 ent2(ooba001To) 环境中逐字段校验
- * 3. 校验通过后在事务中：删除 ent2(ooba001To) 旧数据 → 插入替换后的数据
- * @param schema       数据库 schema
+ * 迁移本质：从 schemaFrom.ent1.ooba001From 查数据，替换 ent→ent2 + 参照表→ooba001To 后插入 schemaTo.ent2
+ * 1. 先为 schemaTo.ent2 在 ooba001To 下的现有数据创建备份表（DDL，Oracle 下隐式提交）
+ * 2. 查询 schemaFrom.ent1(ooba001From) 全部源数据，在 schemaTo.ent2(ooba001To) 环境中校验
+ * 3. 校验通过后在事务中：删除 schemaTo.ent2(ooba001To) 旧数据 → 插入替换后的数据
+ * @param schemaFrom   源数据库 schema
+ * @param schemaTo     目标数据库 schema
  * @param ent1         源企业编号
  * @param ent2         目标企业编号
  * @param ooba001From  源参照表编号（ent1 中的）
@@ -1175,7 +1179,7 @@ export async function validateDocConfig(
  * @returns 备份时间戳、各表复制行数、校验错误列表
  */
 export async function copyDocConfig(
-    schema: string, ent1: number, ent2: number,
+    schemaFrom: string, schemaTo: string, ent1: number, ent2: number,
     ooba001From: string, ooba001To: string, ooba002List: string[],
     mode: ValidateMode = 'collect',
 ): Promise<{ timestamp: number; results: { table: string; deleted: number; inserted: number }[]; errors: ValidateError[] }> {
@@ -1191,27 +1195,27 @@ export async function copyDocConfig(
     const ts = Math.floor(Date.now() / 1000);
     const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
 
-    // Step 1: 创建备份表（备份 ent2 在 ooba001To 下的现有数据，DDL 自动提交）
+    // Step 1: 创建备份表（备份 schemaTo.ent2 在 ooba001To 下的现有数据，DDL 自动提交）
     const backedUpTables: string[] = [];
     for (const { table } of docConfigTables) {
-        const bt = await createBackupTable(schema, table, ts, ent2, ooba001To, ooba002List);
+        const bt = await createBackupTable(schemaTo, table, ts, ent2, ooba001To, ooba002List);
         backedUpTables.push(bt);
     }
-    logger.info({ schema, ent2, ooba001To, ts, tables: backedUpTables }, '[genAooi200] copyDocConfig: 备份表创建完成');
+    logger.info({ schemaTo, ent2, ooba001To, ts, tables: backedUpTables }, '[genAooi200] copyDocConfig: 备份表创建完成');
 
-    // Step 2: 校验 ent1 源数据在 ent2 环境中的合法性
-    const errors = await validateDocConfig(schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode);
+    // Step 2: 校验 schemaFrom.ent1 源数据在 schemaTo.ent2 环境中的合法性
+    const errors = await validateDocConfig(schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode);
     if (errors.length > 0) {
         logger.warn({ errorCount: errors.length }, '[genAooi200] copyDocConfig: 校验不通过，跳过复制（备份表已保留）');
         return { timestamp: ts, results: [], errors };
     }
 
-    // Step 3: 校验全部通过，在事务中执行 DELETE(ent2, ooba001To) + INSERT(替换 ent 和 refCol)
+    // Step 3: 校验全部通过，在事务中执行 DELETE(schemaTo, ent2, ooba001To) + INSERT(替换 ent 和 refCol)
     const results = await externalTransaction(async (exec) => {
         const stepResults: { table: string; deleted: number; inserted: number }[] = [];
 
         for (const { table, entCol, refCol, docCol } of docConfigTables) {
-            const selectSql = `SELECT * FROM ${schema}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
+            const selectSql = `SELECT * FROM ${schemaFrom}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
             const srcResult = await externalDB.query(selectSql);
             const srcRows = srcResult.rows as Record<string, unknown>[];
             if (srcRows.length === 0) {
@@ -1221,7 +1225,7 @@ export async function copyDocConfig(
 
             const cols = Object.keys(srcRows[0]);
 
-            const deleteSql = `DELETE FROM ${schema}.${table} WHERE ${entCol} = ${ent2} AND ${refCol} = '${esc(ooba001To)}' AND ${docCol} IN (${inClause})`;
+            const deleteSql = `DELETE FROM ${schemaTo}.${table} WHERE ${entCol} = ${ent2} AND ${refCol} = '${esc(ooba001To)}' AND ${docCol} IN (${inClause})`;
             await exec(deleteSql);
 
             let inserted = 0;
@@ -1238,7 +1242,7 @@ export async function copyDocConfig(
                     if (typeof v === 'number') return String(v);
                     return `'${esc(String(v))}'`;
                 }).join(', ');
-                const insertSql = `INSERT INTO ${schema}.${table} (${colList}) VALUES (${valList})`;
+                const insertSql = `INSERT INTO ${schemaTo}.${table} (${colList}) VALUES (${valList})`;
                 await exec(insertSql);
                 inserted++;
             }
@@ -1251,7 +1255,7 @@ export async function copyDocConfig(
     });
 
     const totalInserted = results.reduce((s, r) => s + r.inserted, 0);
-    logger.info({ schema, ent1, ent2, ooba001From, ooba001To, ts, totalInserted }, '[genAooi200] copyDocConfig: 全部复制完成');
+    logger.info({ schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ts, totalInserted }, '[genAooi200] copyDocConfig: 全部复制完成');
     return { timestamp: ts, results, errors };
 }
 
