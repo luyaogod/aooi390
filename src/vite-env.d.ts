@@ -110,6 +110,17 @@ interface ElectronAPI {
   aooi200QueryEnt: () => Promise<{ success: boolean; rows: { gzou001: string; gzou003: string }[]; error?: string }>
   aooi200QueryWfOobx: (schema: string, ent: number) => Promise<{ success: boolean; rows: WfOobxRow[]; error?: string }>
   aooi200ReplaceOoblWf: (schema: string, ent: number, rows: WfOobxRow[]) => Promise<{ success: boolean; count?: number; error?: string }>
+  aooi200QueryOoba001List: (schema: string, ent: number) => Promise<{ success: boolean; list: string[]; error?: string }>
+  aooi200CompareOobaRef: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) =>
+    Promise<{ success: boolean; matched: MatchedOobaRow[]; onlyEnt1: OobaRefRow[]; onlyEnt2: OobaRefRow[]; error?: string }>
+  aooi200ValidateDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+    Promise<{ success: boolean; errors: ValidateError[]; error?: string }>
+  aooi200CopyDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+    Promise<{ success: boolean; timestamp: number; results: { table: string; deleted: number; inserted: number }[]; errors: ValidateError[]; error?: string }>
+  aooi200RestoreFromBackup: (schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) =>
+    Promise<{ success: boolean; restored: string[]; error?: string }>
+  aooi200CleanBackups: (schema: string, timestamp?: number) =>
+    Promise<{ success: boolean; cleaned: string[]; error?: string }>
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>
@@ -186,6 +197,31 @@ declare global {
     oobx004: string | null
     oobx003: string | null
     oobx002: string | null
+  }
+
+  interface OobaRefRow {
+    ooba002: string
+    oobxl003: string | null
+    oobx002: string | null
+    oobx003: string | null
+    oobx004: string | null
+  }
+
+  interface MatchedOobaRow {
+    ooba002: string
+    oobxl003Ent1: string | null
+    oobxl003Ent2: string | null
+    oobx002: string | null
+    oobx003: string | null
+    oobx004: string | null
+  }
+
+  interface ValidateError {
+    table: string
+    field: string
+    label: string
+    value: string
+    message: string
   }
 }
 

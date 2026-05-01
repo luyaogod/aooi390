@@ -76,6 +76,25 @@ function GenAooi200Page() {
   const [wfError, setWfError] = useState<string | null>(null)
   const [wfResult, setWfResult] = useState<number | null>(null)
 
+  // 同步单据别设置 状态
+  const [sourceEnt, setSourceEnt] = useState('')
+  const [sourceOoba001, setSourceOoba001] = useState('')
+  const [targetEnt, setTargetEnt] = useState('')
+  const [targetOoba001, setTargetOoba001] = useState('')
+  const [compareLoading, setCompareLoading] = useState(false)
+  const [compareResult, setCompareResult] = useState<{ matched: MatchedOobaRow[]; onlyEnt1: OobaRefRow[]; onlyEnt2: OobaRefRow[] } | null>(null)
+  const [selectedOoba002, setSelectedOoba002] = useState<Set<string>>(new Set())
+  const [validateLoading, setValidateLoading] = useState(false)
+  const [validateErrors, setValidateErrors] = useState<ValidateError[]>([])
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ timestamp: number; results: { table: string; deleted: number; inserted: number }[] } | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [sourceOoba001List, setSourceOoba001List] = useState<string[]>([])
+  const [targetOoba001List, setTargetOoba001List] = useState<string[]>([])
+
+  const sourceSchema = entList.find(e => e.gzou001 === sourceEnt)?.gzou003 ?? ''
+  const targetSchema = entList.find(e => e.gzou001 === targetEnt)?.gzou003 ?? ''
+
   const fetchConnections = async () => {
     setConnectionsLoading(true)
     try {
@@ -317,6 +336,139 @@ function GenAooi200Page() {
       toast.error(msg)
     } finally {
       setWfExecuteLoading(false)
+    }
+  }
+
+  // 同步单据别设置 事件处理
+  const handleCompare = async () => {
+    if (!sourceEnt || !targetEnt || !sourceOoba001 || !targetOoba001) {
+      toast.error('请填写完整的来源和目标信息')
+      return
+    }
+    if (!sourceSchema || !targetSchema) {
+      toast.error('未找到对应企业的 schema，请先加载企业列表')
+      return
+    }
+    if (sourceSchema !== targetSchema) {
+      toast.error('来源和目标企业必须属于同一个 schema')
+      return
+    }
+    setCompareLoading(true)
+    setCompareResult(null)
+    setSelectedOoba002(new Set())
+    setValidateErrors([])
+    setSyncResult(null)
+    setSyncError(null)
+    try {
+      const result = await window.electronAPI.aooi200CompareOobaRef(
+        sourceSchema, Number(sourceEnt), Number(targetEnt), sourceOoba001, targetOoba001,
+      )
+      if (result.success) {
+        setCompareResult({ matched: result.matched, onlyEnt1: result.onlyEnt1, onlyEnt2: result.onlyEnt2 })
+        setSelectedOoba002(new Set(result.matched.map(r => r.ooba002)))
+        toast.success(`查询完成，匹配 ${result.matched.length} 条，仅来源 ${result.onlyEnt1.length} 条，仅目标 ${result.onlyEnt2.length} 条`)
+      } else {
+        toast.error(result.error ?? '查询失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setCompareLoading(false)
+    }
+  }
+
+  const matchedList = compareResult?.matched ?? []
+  const checkedList = matchedList.filter(r => selectedOoba002.has(r.ooba002))
+
+  const handleValidate = async () => {
+    if (checkedList.length === 0) {
+      toast.error('请先在匹配列表中勾选要同步的单据别')
+      return
+    }
+    setValidateLoading(true)
+    setValidateErrors([])
+    try {
+      const result = await window.electronAPI.aooi200ValidateDocConfig(
+        sourceSchema, Number(sourceEnt), Number(targetEnt),
+        sourceOoba001, targetOoba001,
+        checkedList.map(r => r.ooba002), 'collect',
+      )
+      if (result.success) {
+        setValidateErrors(result.errors)
+        if (result.errors.length === 0) {
+          toast.success('校验全部通过')
+        } else {
+          toast.warning(`校验完成，共 ${result.errors.length} 项错误`)
+        }
+      } else {
+        toast.error(result.error ?? '校验失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setValidateLoading(false)
+    }
+  }
+
+  const handleSync = async () => {
+    if (checkedList.length === 0) {
+      toast.error('请先在匹配列表中勾选要同步的单据别')
+      return
+    }
+    setSyncLoading(true)
+    setSyncResult(null)
+    setSyncError(null)
+    try {
+      const result = await window.electronAPI.aooi200CopyDocConfig(
+        sourceSchema, Number(sourceEnt), Number(targetEnt),
+        sourceOoba001, targetOoba001,
+        checkedList.map(r => r.ooba002), 'collect',
+      )
+      if (result.success) {
+        setSyncResult({ timestamp: result.timestamp, results: result.results })
+        if (result.errors.length > 0) {
+          setValidateErrors(result.errors)
+          toast.warning(`校验不通过，共 ${result.errors.length} 项错误，已跳过同步（备份表 ts=${result.timestamp} 已保留）`)
+        } else {
+          const total = result.results.reduce((s: number, r: { inserted: number }) => s + r.inserted, 0)
+          toast.success(`同步完成，共插入 ${total} 条记录（备份 ts=${result.timestamp}）`)
+        }
+      } else {
+        setSyncError(result.error ?? '同步失败')
+        toast.error(result.error ?? '同步失败')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setSyncError(msg)
+      toast.error(msg)
+    } finally {
+      setSyncLoading(false)
+    }
+  }
+
+  const toggleOoba002 = (ooba002: string) => {
+    const next = new Set(selectedOoba002)
+    if (next.has(ooba002)) { next.delete(ooba002) } else { next.add(ooba002) }
+    setSelectedOoba002(next)
+  }
+
+  const handleFetchOoba001List = async (ent: string, role: 'source' | 'target') => {
+    const schema = entList.find(e => e.gzou001 === ent)?.gzou003
+    if (!schema || !ent) return
+    try {
+      const result = await window.electronAPI.aooi200QueryOoba001List(schema, Number(ent))
+      if (result.success) {
+        if (role === 'source') setSourceOoba001List(result.list)
+        else setTargetOoba001List(result.list)
+      }
+    } catch { /* ignore */ }
+  }
+
+  const toggleAllMatched = () => {
+    if (selectedOoba002.size === matchedList.length) {
+      setSelectedOoba002(new Set())
+    } else {
+      setSelectedOoba002(new Set(matchedList.map(r => r.ooba002)))
     }
   }
 
@@ -738,6 +890,164 @@ function GenAooi200Page() {
               }
               {wfExecuteLoading ? '更新中...' : '执行更新'}
             </Button>
+          )}
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>同步单据别设置</CardTitle>
+          <CardDescription>将来源 ENT 指定参照表下的单据别配置迁移到目标 ENT 指定参照表</CardDescription>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="来源 ENT">
+              <Select value={sourceEnt} onValueChange={(v) => { if (!v) return; setSourceEnt(v); setSourceOoba001(''); setSourceOoba001List([]); setCompareResult(null); setValidateErrors([]); setSyncResult(null); handleFetchOoba001List(v, 'source') }} disabled={entList.length === 0}>
+                <SelectTrigger><SelectValue placeholder="选择来源企业" /></SelectTrigger>
+                <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Field label="来源参照表">
+              <Select value={sourceOoba001} onValueChange={(v) => { setSourceOoba001(v); setCompareResult(null); setValidateErrors([]); setSyncResult(null) }} disabled={!sourceEnt || sourceOoba001List.length === 0}>
+                <SelectTrigger><SelectValue placeholder={sourceEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
+                <SelectContent><SelectGroup>{sourceOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Field label="目标 ENT">
+              <Select value={targetEnt} onValueChange={(v) => { if (!v) return; setTargetEnt(v); setTargetOoba001(''); setTargetOoba001List([]); setCompareResult(null); setValidateErrors([]); setSyncResult(null); handleFetchOoba001List(v, 'target') }} disabled={entList.length === 0}>
+                <SelectTrigger><SelectValue placeholder="选择目标企业" /></SelectTrigger>
+                <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Field label="目标参照表">
+              <Select value={targetOoba001} onValueChange={(v) => { setTargetOoba001(v); setCompareResult(null); setValidateErrors([]); setSyncResult(null) }} disabled={!targetEnt || targetOoba001List.length === 0}>
+                <SelectTrigger><SelectValue placeholder={targetEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
+                <SelectContent><SelectGroup>{targetOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          {syncError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="size-4" />
+              <AlertTitle>同步失败</AlertTitle>
+              <AlertDescription>{syncError}</AlertDescription>
+            </Alert>
+          )}
+
+          {syncResult && (
+            <Alert variant="default">
+              <CheckCircle2 className="size-4" />
+              <AlertTitle>同步完成（备份 ts={syncResult.timestamp}）</AlertTitle>
+              <AlertDescription>
+                <Table>
+                  <TableHeader><TableRow><TableHead>表名</TableHead><TableHead>删除</TableHead><TableHead>插入</TableHead></TableRow></TableHeader>
+                  <TableBody>{syncResult.results.map(r => <TableRow key={r.table}><TableCell className="font-mono">{r.table}</TableCell><TableCell>{r.deleted}</TableCell><TableCell>{r.inserted}</TableCell></TableRow>)}</TableBody>
+                </Table>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {validateErrors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="size-4" />
+              <AlertTitle>校验错误（共 {validateErrors.length} 项）</AlertTitle>
+              <AlertDescription>
+                <div className="max-h-60 overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>表</TableHead><TableHead>字段</TableHead><TableHead>值</TableHead><TableHead>错误描述</TableHead></TableRow></TableHeader>
+                    <TableBody>{validateErrors.map((e, i) => <TableRow key={i}><TableCell className="font-mono text-xs">{e.table}</TableCell><TableCell>{e.label}</TableCell><TableCell className="font-mono text-xs">{e.value}</TableCell><TableCell className="text-xs">{e.message}</TableCell></TableRow>)}</TableBody>
+                  </Table>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {compareResult && (
+            <>
+              <div className="text-sm text-muted-foreground">
+                匹配 {compareResult.matched.length} 条 · 仅来源 {compareResult.onlyEnt1.length} 条 · 仅目标 {compareResult.onlyEnt2.length} 条
+                {matchedList.length > 0 && <span className="ml-2">（已勾选 {checkedList.length}/{matchedList.length}）</span>}
+              </div>
+
+              {matchedList.length > 0 && (
+                <div className="max-h-80 overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10">
+                          <input type="checkbox" checked={checkedList.length === matchedList.length} onChange={toggleAllMatched} />
+                        </TableHead>
+                        <TableHead>单据别</TableHead>
+                        <TableHead>来源说明</TableHead>
+                        <TableHead>目标说明</TableHead>
+                        <TableHead>模组别</TableHead>
+                        <TableHead>单据性质</TableHead>
+                        <TableHead>作业编号</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matchedList.map(r => (
+                        <TableRow key={r.ooba002} className={selectedOoba002.has(r.ooba002) ? '' : 'opacity-50'}>
+                          <TableCell><input type="checkbox" checked={selectedOoba002.has(r.ooba002)} onChange={() => toggleOoba002(r.ooba002)} /></TableCell>
+                          <TableCell className="font-mono">{r.ooba002}</TableCell>
+                          <TableCell>{r.oobxl003Ent1}</TableCell>
+                          <TableCell>{r.oobxl003Ent2}</TableCell>
+                          <TableCell>{r.oobx002}</TableCell>
+                          <TableCell>{r.oobx003}</TableCell>
+                          <TableCell className="font-mono text-xs">{r.oobx004}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {compareResult.onlyEnt1.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer text-sm text-muted-foreground">仅来源 ({compareResult.onlyEnt1.length} 条)</summary>
+                  <div className="max-h-40 overflow-auto rounded-md border mt-1">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>单据别</TableHead><TableHead>说明</TableHead><TableHead>模组别</TableHead><TableHead>单据性质</TableHead><TableHead>作业编号</TableHead></TableRow></TableHeader>
+                      <TableBody>{compareResult.onlyEnt1.map(r => <TableRow key={r.ooba002}><TableCell className="font-mono">{r.ooba002}</TableCell><TableCell>{r.oobxl003}</TableCell><TableCell>{r.oobx002}</TableCell><TableCell>{r.oobx003}</TableCell><TableCell className="font-mono text-xs">{r.oobx004}</TableCell></TableRow>)}</TableBody>
+                    </Table>
+                  </div>
+                </details>
+              )}
+
+              {compareResult.onlyEnt2.length > 0 && (
+                <details>
+                  <summary className="cursor-pointer text-sm text-muted-foreground">仅目标 ({compareResult.onlyEnt2.length} 条)</summary>
+                  <div className="max-h-40 overflow-auto rounded-md border mt-1">
+                    <Table>
+                      <TableHeader><TableRow><TableHead>单据别</TableHead><TableHead>说明</TableHead><TableHead>模组别</TableHead><TableHead>单据性质</TableHead><TableHead>作业编号</TableHead></TableRow></TableHeader>
+                      <TableBody>{compareResult.onlyEnt2.map(r => <TableRow key={r.ooba002}><TableCell className="font-mono">{r.ooba002}</TableCell><TableCell>{r.oobxl003}</TableCell><TableCell>{r.oobx002}</TableCell><TableCell>{r.oobx003}</TableCell><TableCell className="font-mono text-xs">{r.oobx004}</TableCell></TableRow>)}</TableBody>
+                    </Table>
+                  </div>
+                </details>
+              )}
+            </>
+          )}
+        </CardContent>
+
+        <CardFooter className="gap-2">
+          <Button variant="outline" size="sm" onClick={handleCompare} disabled={compareLoading || !sourceEnt || !targetEnt || !sourceOoba001 || !targetOoba001} className="gap-1.5">
+            {compareLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+            {compareLoading ? '查询中...' : '查询数据'}
+          </Button>
+
+          {matchedList.length > 0 && (
+            <>
+              <Button variant="outline" size="sm" onClick={handleValidate} disabled={validateLoading || checkedList.length === 0} className="gap-1.5">
+                {validateLoading ? <Loader2 className="size-3.5 animate-spin" /> : <AlertTriangle className="size-3.5" />}
+                {validateLoading ? '校验中...' : '执行校验'}
+              </Button>
+              <Button variant="default" size="sm" onClick={handleSync} disabled={syncLoading || checkedList.length === 0} className="gap-1.5">
+                {syncLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+                {syncLoading ? '同步中...' : '同步数据'}
+              </Button>
+            </>
           )}
         </CardFooter>
       </Card>

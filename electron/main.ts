@@ -7,7 +7,7 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-aooi200'
-import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig, queryWfOobxData, replaceOoblWfData } from './core/gen-aooi200'
+import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig, queryWfOobxData, replaceOoblWfData, compareOobaRef, validateDocConfig, copyDocConfig, restoreFromBackup, cleanBackups, queryOoba001List } from './core/gen-aooi200'
 import { queryEnt } from './com-query/external'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
@@ -476,14 +476,69 @@ ipcMain.handle('aooi200:query-wf-oobx', async (_event, schema: string, ent: numb
   }
 })
 
-// IPC: 执行 oobl wf 数据替换（事务）
-ipcMain.handle('aooi200:replace-oobl-wf', async (_event, schema: string, ent: number, rows: unknown[]) => {
+// IPC: 查询指定 ENT 可用的参照表编号列表
+ipcMain.handle('aooi200:query-ooba001-list', async (_event, schema: string, ent: number) => {
   try {
-    const count = await replaceOoblWfData(schema, ent, rows as Parameters<typeof replaceOoblWfData>[2])
-    return { success: true, count }
+    const list = await queryOoba001List(schema, ent)
+    return { success: true, list }
   } catch (error) {
-    logger.error(error, '[Main] 执行 oobl wf 替换失败')
-    return { success: false, error: error instanceof Error ? error.message : String(error) }
+    logger.error(error, '[Main] 查询参照表列表失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), list: [] }
+  }
+})
+
+// IPC: 比较两个 ENT 的单据别参照表
+ipcMain.handle('aooi200:compare-ooba-ref', async (_event, schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) => {
+  try {
+    const result = await compareOobaRef(schema, ent1, ent2, ooba001From, ooba001To)
+    return { success: true, ...result }
+  } catch (error) {
+    logger.error(error, '[Main] 比较单据别参照表失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), matched: [], onlyEnt1: [], onlyEnt2: [] }
+  }
+})
+
+// IPC: 校验单据别配置迁移
+ipcMain.handle('aooi200:validate-doc-config', async (_event, schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) => {
+  try {
+    const errors = await validateDocConfig(schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode as 'collect' | 'failFast')
+    return { success: true, errors }
+  } catch (error) {
+    logger.error(error, '[Main] 校验单据别配置迁移失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), errors: [] }
+  }
+})
+
+// IPC: 复制单据别配置（含备份→校验→迁移）
+ipcMain.handle('aooi200:copy-doc-config', async (_event, schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) => {
+  try {
+    const result = await copyDocConfig(schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode as 'collect' | 'failFast')
+    return { success: true, ...result }
+  } catch (error) {
+    logger.error(error, '[Main] 复制单据别配置失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), timestamp: 0, results: [], errors: [] }
+  }
+})
+
+// IPC: 从备份恢复
+ipcMain.handle('aooi200:restore-from-backup', async (_event, schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) => {
+  try {
+    const restored = await restoreFromBackup(schema, timestamp, ent2, ooba001, ooba002List)
+    return { success: true, restored }
+  } catch (error) {
+    logger.error(error, '[Main] 从备份恢复失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), restored: [] }
+  }
+})
+
+// IPC: 清理备份表
+ipcMain.handle('aooi200:clean-backups', async (_event, schema: string, timestamp?: number) => {
+  try {
+    const cleaned = await cleanBackups(schema, timestamp)
+    return { success: true, cleaned }
+  } catch (error) {
+    logger.error(error, '[Main] 清理备份表失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), cleaned: [] }
   }
 })
 

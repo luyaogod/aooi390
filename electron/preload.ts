@@ -37,6 +37,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aooi200QueryEnt: () => ipcRenderer.invoke('aooi200:query-ent'),
   aooi200QueryWfOobx: (schema: string, ent: number) => ipcRenderer.invoke('aooi200:query-wf-oobx', schema, ent),
   aooi200ReplaceOoblWf: (schema: string, ent: number, rows: unknown[]) => ipcRenderer.invoke('aooi200:replace-oobl-wf', schema, ent, rows),
+
+  // 单据别参照表比对 & 配置迁移
+  aooi200QueryOoba001List: (schema: string, ent: number) => ipcRenderer.invoke('aooi200:query-ooba001-list', schema, ent),
+  aooi200CompareOobaRef: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string) =>
+    ipcRenderer.invoke('aooi200:compare-ooba-ref', schema, ent1, ent2, ooba001From, ooba001To),
+  aooi200ValidateDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+    ipcRenderer.invoke('aooi200:validate-doc-config', schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
+  aooi200CopyDocConfig: (schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
+    ipcRenderer.invoke('aooi200:copy-doc-config', schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
+  aooi200RestoreFromBackup: (schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) =>
+    ipcRenderer.invoke('aooi200:restore-from-backup', schema, timestamp, ent2, ooba001, ooba002List),
+  aooi200CleanBackups: (schema: string, timestamp?: number) =>
+    ipcRenderer.invoke('aooi200:clean-backups', schema, timestamp),
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
     ipcRenderer.on('aooi200:validation-progress', listener)

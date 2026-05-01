@@ -4,6 +4,9 @@ import { externalDB, appDB } from '../db/clients';
 import logger from '../utils/logger';
 import { dbConnectionManager } from '../config/db-connections';
 import { Oobx } from '@prisma/client';
+import { ValidateError, ValidateMode } from './sync-aooi200';
+
+
 
 /** 表名 → Prisma 模型名映射（注意：Prisma 模型名首字母大写） */
 const tableModelMap: Record<string, string> = {
@@ -924,4 +927,724 @@ export async function replaceOoblWfData(schema: string, ent: number, rows: WfOob
             '[genAooi200] replaceOoblWfData: 处理完成');
         return insertedCount;
     });
+}
+// ==================== 单据别参照表比对 & 配置复制 ====================
+
+/** 单据别配置涉及的 8 张表 */
+interface DocConfigTable {
+    table: string;   // 表名，如 'ooba_t'
+    entCol: string;  // 企业编号列，如 'oobaent'
+    refCol: string;  // 参照表编号列，如 'ooba001'
+    docCol: string;  // 单据别列，如 'ooba002'
+}
+
+const docConfigTables: DocConfigTable[] = [
+    { table: 'ooba_t', entCol: 'oobaent', refCol: 'ooba001', docCol: 'ooba002' },
+    { table: 'oobb_t', entCol: 'oobbent', refCol: 'oobb001', docCol: 'oobb002' },
+    { table: 'oobc_t', entCol: 'oobcent', refCol: 'oobc001', docCol: 'oobc002' },
+    { table: 'oobd_t', entCol: 'oobdent', refCol: 'oobd001', docCol: 'oobd002' },
+    { table: 'oobh_t', entCol: 'oobhent', refCol: 'oobh001', docCol: 'oobh002' },
+    { table: 'oobi_t', entCol: 'oobient', refCol: 'oobi001', docCol: 'oobi002' },
+    { table: 'oobj_t', entCol: 'oobjent', refCol: 'oobj001', docCol: 'oobj002' },
+    { table: 'oobk_t', entCol: 'oobkent', refCol: 'oobk001', docCol: 'oobk002' },
+];
+
+/** 单条单据别参照表查询结果 */
+export interface OobaRefRow {
+    ooba002: string;
+    oobxl003: string | null;
+    oobx002: string | null;
+    oobx003: string | null;
+    oobx004: string | null;
+}
+
+/** 两个 ENT 匹配的单据别行 */
+export interface MatchedOobaRow {
+    ooba002: string;
+    oobxl003Ent1: string | null;
+    oobxl003Ent2: string | null;
+    oobx002: string | null;
+    oobx003: string | null;
+    oobx004: string | null;
+}
+
+/**
+ * 查询单个 ENT 在指定参照表下的单据别列表
+ * SELECT ooba002,oobxl003,oobx002,oobx003,oobx004
+ * FROM ooba_t
+ * LEFT JOIN oobx_t ON oobaent = oobxent AND ooba002 = oobx001
+ * LEFT JOIN oobxl_t ON oobx001 = oobxl001 AND oobxent = oobxlent AND oobxl002 = 'zh_CN'
+ * WHERE oobaent = ${ent} AND ooba001 = ${ooba001}
+ */
+export async function queryOobaByRef(
+    schema: string, ent: number, ooba001: string,
+): Promise<OobaRefRow[]> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法查询单据别参照表');
+    }
+
+    const sql = `
+        SELECT ooba002, oobxl003, oobx002, oobx003, oobx004
+        FROM ${schema}.ooba_t
+        LEFT JOIN ${schema}.oobx_t ON oobaent = oobxent AND ooba002 = oobx001
+        LEFT JOIN ${schema}.oobxl_t ON oobx001 = oobxl001 AND oobxent = oobxlent AND oobxl002 = 'zh_CN'
+        WHERE oobaent = ${ent}
+          AND ooba001 = '${esc(ooba001)}'
+        ORDER BY ooba002
+    `;
+
+    logger.debug({ sql, schema, ent, ooba001 }, '[genAooi200] queryOobaByRef: 查询单据别参照表');
+    const result = await externalDB.query(sql);
+    const rows = result.rows as Record<string, unknown>[];
+    logger.info({ schema, ent, ooba001, count: rows.length }, '[genAooi200] queryOobaByRef: 查询完成');
+
+    return rows.map(row => ({
+        ooba002: String(row['ooba002'] ?? ''),
+        oobxl003: row['oobxl003'] != null ? String(row['oobxl003']) : null,
+        oobx002: row['oobx002'] != null ? String(row['oobx002']) : null,
+        oobx003: row['oobx003'] != null ? String(row['oobx003']) : null,
+        oobx004: row['oobx004'] != null ? String(row['oobx004']) : null,
+    }));
+}
+
+/**
+ * 比对两个 ENT 在不同参照表下的单据别数据
+ * 按 ooba002,oobx002,oobx003,oobx004 完全匹配进行关联
+ * @param ooba001From 源参照表编号（ent1 中的）
+ * @param ooba001To   目标参照表编号（ent2 中的）
+ * @returns 匹配行（含双方 oobxl003）、仅 ent1 的行、仅 ent2 的行
+ */
+export async function compareOobaRef(
+    schema: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string,
+): Promise<{ matched: MatchedOobaRow[]; onlyEnt1: OobaRefRow[]; onlyEnt2: OobaRefRow[] }> {
+    const [rows1, rows2] = await Promise.all([
+        queryOobaByRef(schema, ent1, ooba001From),
+        queryOobaByRef(schema, ent2, ooba001To),
+    ]);
+
+    const map2 = new Map<string, OobaRefRow>();
+    for (const r of rows2) {
+        map2.set(r.ooba002, r);
+    }
+
+    const matched: MatchedOobaRow[] = [];
+    const onlyEnt1: OobaRefRow[] = [];
+    const matchedKeys = new Set<string>();
+
+    for (const r1 of rows1) {
+        const r2 = map2.get(r1.ooba002);
+        if (
+            r2 &&
+            r1.oobx002 === r2.oobx002 &&
+            r1.oobx003 === r2.oobx003 &&
+            r1.oobx004 === r2.oobx004
+        ) {
+            matched.push({
+                ooba002: r1.ooba002,
+                oobxl003Ent1: r1.oobxl003,
+                oobxl003Ent2: r2.oobxl003,
+                oobx002: r1.oobx002,
+                oobx003: r1.oobx003,
+                oobx004: r1.oobx004,
+            });
+            matchedKeys.add(r1.ooba002);
+        } else {
+            onlyEnt1.push(r1);
+        }
+    }
+
+    const onlyEnt2 = rows2.filter(r => !matchedKeys.has(r.ooba002));
+
+    logger.info({
+        schema, ent1, ent2, ooba001From, ooba001To,
+        matched: matched.length, onlyEnt1: onlyEnt1.length, onlyEnt2: onlyEnt2.length,
+    }, '[genAooi200] compareOobaRef: 比对完成');
+
+    return { matched, onlyEnt1, onlyEnt2 };
+}
+
+/** 在外部数据库建表备份数据（DDL，Oracle 下会隐式提交） */
+async function createBackupTable(
+    schema: string, table: string, ts: number, ent: number, ooba001: string, ooba002List: string[],
+): Promise<string> {
+    const backupTable = `${table}_bck_${ts}`;
+    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
+    const t = docConfigTables.find(c => c.table === table)!;
+    const sql = `CREATE TABLE ${schema}.${backupTable} AS SELECT * FROM ${schema}.${table} WHERE ${t.entCol} = ${ent} AND ${t.refCol} = '${esc(ooba001)}' AND ${t.docCol} IN (${inClause})`;
+    logger.debug({ sql }, '[genAooi200] createBackupTable: %s', backupTable);
+    await externalDB.query(sql);
+    return backupTable;
+}
+
+/** 添加校验错误，failFast 模式下返回 true 表示应立即终止 */
+function pushError(errors: ValidateError[], err: ValidateError | null, mode: ValidateMode): boolean {
+    if (err) {
+        errors.push(err);
+        return mode === 'failFast';
+    }
+    return false;
+}
+
+/**
+ * 校验 ent1 的单据别配置能否迁移到 ent2（仅校验，不修改数据）
+ * 查询 ent1(ooba001From) 全部源数据，在 ent2(ooba001To) 环境中逐表逐行校验关键字段
+ * @param schema       数据库 schema
+ * @param ent1         源企业编号
+ * @param ent2         目标企业编号
+ * @param ooba001From  源参照表编号
+ * @param ooba001To    目标参照表编号
+ * @param ooba002List  要校验的单据别列表
+ * @param mode         校验模式：collect-收集所有错误 | failFast-遇错即停（默认 collect）
+ * @returns 校验错误列表（空数组表示全部通过）
+ */
+export async function validateDocConfig(
+    schema: string, ent1: number, ent2: number,
+    ooba001From: string, ooba001To: string, ooba002List: string[],
+    mode: ValidateMode = 'collect',
+): Promise<ValidateError[]> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法校验单据别配置');
+    }
+
+    if (ooba002List.length === 0) {
+        return [];
+    }
+
+    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
+    const ent2Str = String(ent2);
+    const errors: ValidateError[] = [];
+
+    for (const { table, entCol, refCol, docCol } of docConfigTables) {
+        const selectSql = `SELECT * FROM ${schema}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
+        const srcResult = await externalDB.query(selectSql);
+        const srcRows = srcResult.rows as Record<string, unknown>[];
+
+        if (srcRows.length === 0) continue;
+
+        for (const row of srcRows) {
+            switch (table) {
+                case 'ooba_t':
+                    if (pushError(errors, await ooba001Chk(ooba001To, ent2Str, schema), mode)) return errors;
+                    if (pushError(errors, await ooba002Chk(String(row['ooba002'] ?? ''), ent2Str, schema), mode)) return errors;
+                    break;
+                case 'oobb_t':
+                    if (pushError(errors, await oobb004Chk(String(row['oobb004'] ?? ''), String(row['oobb002'] ?? ''), ent2Str, schema), mode)) return errors;
+                    break;
+                case 'oobc_t':
+                    if (pushError(errors, await oobc003Chk(String(row['oobc003'] ?? ''), String(row['oobc004'] ?? ''), ent2Str, schema), mode)) return errors;
+                    break;
+                case 'oobd_t':
+                    if (pushError(errors, await oobd004Chk(String(row['oobd003'] ?? ''), String(row['oobd004'] ?? ''), ent2Str, schema), mode)) return errors;
+                    break;
+                case 'oobh_t':
+                    if (pushError(errors, await oobh003Chk(String(row['oobh003'] ?? ''), ent2Str, schema), mode)) return errors;
+                    break;
+                case 'oobi_t':
+                    if (pushError(errors, await oobi003Chk(String(row['oobi002'] ?? ''), String(row['oobi003'] ?? ''), ent2Str, schema), mode)) return errors;
+                    break;
+                case 'oobj_t':
+                    if (pushError(errors, await oobj003Chk(String(row['oobj003'] ?? ''), ent2Str, schema), mode)) return errors;
+                    break;
+                case 'oobk_t':
+                    if (pushError(errors, await oobj003Chk(String(row['oobk003'] ?? ''), ent2Str, schema, 'oobk_t', 'oobk003', '库存标签编号T'), mode)) return errors;
+                    break;
+            }
+        }
+
+        if (mode === 'failFast' && errors.length > 0) return errors;
+    }
+
+    logger.info({ schema, ent1, ent2, ooba001From, ooba001To, errorCount: errors.length }, '[genAooi200] validateDocConfig: 校验完成');
+    return errors;
+}
+
+/**
+ * 将 ent1 指定参照表的单据别配置迁移到 ent2 指定参照表（含备份→校验→删除→插入）
+ *
+ * 迁移本质：从 ent1.ooba001From 查数据，替换 ent→ent2 + 参照表→ooba001To 后插入 ent2
+ * 1. 先为 ent2 在 ooba001To 下的现有数据创建备份表（DDL，Oracle 下隐式提交）
+ * 2. 查询 ent1(ooba001From) 全部源数据，在 ent2(ooba001To) 环境中逐字段校验
+ * 3. 校验通过后在事务中：删除 ent2(ooba001To) 旧数据 → 插入替换后的数据
+ * @param schema       数据库 schema
+ * @param ent1         源企业编号
+ * @param ent2         目标企业编号
+ * @param ooba001From  源参照表编号（ent1 中的）
+ * @param ooba001To    目标参照表编号（ent2 中的）
+ * @param ooba002List  要复制的单据别列表（ent1/ent2 共用同一套单据别编号）
+ * @param mode         校验模式：collect-收集所有错误 | failFast-遇错即停（默认 collect）
+ * @returns 备份时间戳、各表复制行数、校验错误列表
+ */
+export async function copyDocConfig(
+    schema: string, ent1: number, ent2: number,
+    ooba001From: string, ooba001To: string, ooba002List: string[],
+    mode: ValidateMode = 'collect',
+): Promise<{ timestamp: number; results: { table: string; deleted: number; inserted: number }[]; errors: ValidateError[] }> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法复制单据别配置');
+    }
+
+    if (ooba002List.length === 0) {
+        logger.info('[genAooi200] copyDocConfig: ooba002List 为空，跳过');
+        return { timestamp: 0, results: [], errors: [] };
+    }
+
+    const ts = Math.floor(Date.now() / 1000);
+    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
+
+    // Step 1: 创建备份表（备份 ent2 在 ooba001To 下的现有数据，DDL 自动提交）
+    const backedUpTables: string[] = [];
+    for (const { table } of docConfigTables) {
+        const bt = await createBackupTable(schema, table, ts, ent2, ooba001To, ooba002List);
+        backedUpTables.push(bt);
+    }
+    logger.info({ schema, ent2, ooba001To, ts, tables: backedUpTables }, '[genAooi200] copyDocConfig: 备份表创建完成');
+
+    // Step 2: 校验 ent1 源数据在 ent2 环境中的合法性
+    const errors = await validateDocConfig(schema, ent1, ent2, ooba001From, ooba001To, ooba002List, mode);
+    if (errors.length > 0) {
+        logger.warn({ errorCount: errors.length }, '[genAooi200] copyDocConfig: 校验不通过，跳过复制（备份表已保留）');
+        return { timestamp: ts, results: [], errors };
+    }
+
+    // Step 3: 校验全部通过，在事务中执行 DELETE(ent2, ooba001To) + INSERT(替换 ent 和 refCol)
+    const results = await externalTransaction(async (exec) => {
+        const stepResults: { table: string; deleted: number; inserted: number }[] = [];
+
+        for (const { table, entCol, refCol, docCol } of docConfigTables) {
+            const selectSql = `SELECT * FROM ${schema}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
+            const srcResult = await externalDB.query(selectSql);
+            const srcRows = srcResult.rows as Record<string, unknown>[];
+            if (srcRows.length === 0) {
+                stepResults.push({ table, deleted: 0, inserted: 0 });
+                continue;
+            }
+
+            const cols = Object.keys(srcRows[0]);
+
+            const deleteSql = `DELETE FROM ${schema}.${table} WHERE ${entCol} = ${ent2} AND ${refCol} = '${esc(ooba001To)}' AND ${docCol} IN (${inClause})`;
+            await exec(deleteSql);
+
+            let inserted = 0;
+            for (const srcRow of srcRows) {
+                const row = {
+                    ...srcRow,
+                    [entCol.toLowerCase()]: ent2, [entCol.toUpperCase()]: ent2,
+                    [refCol.toLowerCase()]: ooba001To, [refCol.toUpperCase()]: ooba001To,
+                };
+                const colList = cols.map(c => `"${c}"`).join(', ');
+                const valList = cols.map(c => {
+                    const v = row[c.toLowerCase()] ?? row[c.toUpperCase()] ?? row[c];
+                    if (v === null || v === undefined) return 'NULL';
+                    if (typeof v === 'number') return String(v);
+                    return `'${esc(String(v))}'`;
+                }).join(', ');
+                const insertSql = `INSERT INTO ${schema}.${table} (${colList}) VALUES (${valList})`;
+                await exec(insertSql);
+                inserted++;
+            }
+
+            stepResults.push({ table, deleted: srcRows.length, inserted });
+            logger.debug({ table, deleted: srcRows.length, inserted }, '[genAooi200] copyDocConfig: %s 处理完成', table);
+        }
+
+        return stepResults;
+    });
+
+    const totalInserted = results.reduce((s, r) => s + r.inserted, 0);
+    logger.info({ schema, ent1, ent2, ooba001From, ooba001To, ts, totalInserted }, '[genAooi200] copyDocConfig: 全部复制完成');
+    return { timestamp: ts, results, errors };
+}
+
+/**
+ * 从备份表恢复数据
+ * 将备份表数据回写到原表（清空当前数据后插入）
+ * @param schema      数据库 schema
+ * @param timestamp   备份时间戳
+ * @param ent2        目标企业编号
+ * @param ooba001     参照表编号
+ * @param ooba002List 单据别列表（用于匹配要恢复的行范围）
+ */
+export async function restoreFromBackup(
+    schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[],
+): Promise<string[]> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法从备份恢复');
+    }
+
+    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
+    const restored: string[] = [];
+
+    for (const { table, entCol, refCol, docCol } of docConfigTables) {
+        const backupTable = `${table}_bck_${timestamp}`;
+
+        // 检查备份表是否存在
+        try {
+            await externalDB.query(`SELECT 1 FROM ${schema}.${backupTable} WHERE 1=0`);
+        } catch {
+            logger.warn('[genAooi200] restoreFromBackup: 备份表不存在，跳过 %s', backupTable);
+            continue;
+        }
+
+        await externalTransaction(async (exec) => {
+            // 删除当前数据
+            const deleteSql = `DELETE FROM ${schema}.${table} WHERE ${entCol} = ${ent2} AND ${refCol} = '${esc(ooba001)}' AND ${docCol} IN (${inClause})`;
+            await exec(deleteSql);
+
+            // 从备份表插回
+            const insertSql = `INSERT INTO ${schema}.${table} SELECT * FROM ${schema}.${backupTable}`;
+            await exec(insertSql);
+
+            // 删除备份表
+            await exec(`DROP TABLE ${schema}.${backupTable}`);
+        });
+
+        restored.push(backupTable);
+        logger.info('[genAooi200] restoreFromBackup: %s 已恢复并删除', backupTable);
+    }
+
+    logger.info({ schema, timestamp, restored }, '[genAooi200] restoreFromBackup: 恢复完成');
+    return restored;
+}
+
+/**
+ * 清理备份表
+ * @param schema    数据库 schema
+ * @param timestamp 指定时间戳则只清理该批，不传则清理所有符合 ooba_bck_xxx 命名规则的表
+ * @returns 清理的表名列表
+ */
+export async function cleanBackups(schema: string, timestamp?: number): Promise<string[]> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法清理备份表');
+    }
+
+    const cleaned: string[] = [];
+
+    if (timestamp !== undefined) {
+        // 按时间戳精确清理
+        for (const { table } of docConfigTables) {
+            const backupTable = `${table}_bck_${timestamp}`;
+            try {
+                await externalDB.query(`DROP TABLE ${schema}.${backupTable}`);
+                cleaned.push(backupTable);
+                logger.info('[genAooi200] cleanBackups: 已删除 %s', backupTable);
+            } catch {
+                logger.debug('[genAooi200] cleanBackups: 表不存在，跳过 %s', backupTable);
+            }
+        }
+    } else {
+        // 清理全部备份表：查询用户表名中包含 _bck_ 的表
+        const dbType = externalDB.dbType;
+        let findSql: string;
+        if (dbType === 'oracle') {
+            findSql = `SELECT table_name FROM all_tables WHERE owner = UPPER('${esc(schema)}') AND table_name LIKE '%_BCK\\_%' ESCAPE '\\'`;
+        } else {
+            findSql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${esc(schema)}' AND table_name LIKE '%_bck_%'`;
+        }
+
+        try {
+            const result = await externalDB.query(findSql);
+            const rows = result.rows as Record<string, unknown>[];
+            for (const row of rows) {
+                const tname = String(row['table_name'] ?? row['TABLE_NAME'] ?? '');
+                if (!tname) continue;
+                try {
+                    await externalDB.query(`DROP TABLE ${schema}.${tname}`);
+                    cleaned.push(tname);
+                    logger.info('[genAooi200] cleanBackups: 已删除 %s', tname);
+                } catch (err) {
+                    logger.warn({ err }, '[genAooi200] cleanBackups: 删除 %s 失败', tname);
+                }
+            }
+        } catch (err) {
+            logger.warn({ err }, '[genAooi200] cleanBackups: 查询备份表列表失败');
+        }
+    }
+
+    logger.info({ schema, timestamp, cleaned }, '[genAooi200] cleanBackups: 清理完成');
+    return cleaned;
+}
+
+/** 
+ * 检查参照表是否存在
+ * @param ooba001  参照表编号
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @returns     校验结果
+*/
+async function ooba001Chk(ooba001: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ ooba001, entTo, schemaTo }, 'ooba001Chk: 校验参照表编号');
+    const sql_ooal_count = `
+        SELECT COUNT(*) AS cnt FROM ${schemaTo}.ooal_t
+        WHERE ooal001 ='3'
+        AND ooal002 = '${ooba001}'
+        AND ooalent = '${entTo}'
+        `;
+    logger.debug({ sql: sql_ooal_count }, 'ooba001Chk: 查询参照表编号');
+    const countResult = await externalDB.query(sql_ooal_count);
+
+    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    if (count === 0) {
+        logger.warn({ ooba001 }, 'ooba001Chk: 参照表编号不存在');
+        return { table: 'ooba_t', field: 'ooba001', label: '参照表编号', value: ooba001, message: `[ooba_t] 参照表编号 [${ooba001}] 在参照表定义表(ooal_t, 类别=3)中不存在` };
+    }
+    logger.debug({ ooba001 }, 'ooba001Chk: 校验通过');
+    return null;
+}
+
+/**
+ * 检查单据别是否存在 
+ * @param ooba002  单据别编号
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @returns     校验结果
+*/
+async function ooba002Chk(ooba002: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ ooba002, entTo, schemaTo }, 'ooba002Chk: 校验单据别编号');
+    const sql_oobx_count_ooba = `
+        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oobx_t
+        WHERE oobxent = '${entTo}'
+        AND oobx001 = '${ooba002}'
+        `;
+    logger.debug({ sql: sql_oobx_count_ooba }, 'ooba002Chk: 查询单据别编号');
+    const countResult = await externalDB.query(sql_oobx_count_ooba);
+    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    if (count === 0) {
+        logger.warn({ ooba002 }, 'ooba002Chk: 单据别编号不存在');
+        return { table: 'ooba_t', field: 'ooba002', label: '单据别编号', value: ooba002, message: `[ooba_t] 单据别编号 [${ooba002}] 在单据别定义表(oobx_t)中不存在` };
+    }
+    logger.debug({ ooba002 }, 'ooba002Chk: 校验通过');
+    return null;
+}
+
+/** 
+ * 校验字段编号是否存在于对应的单据别中
+ * @param oobb004  字段编号
+ * @param ooba002  单据别编号
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @returns     校验结果
+*/
+async function oobb004Chk(oobb004: string, ooba002: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ oobb004, ooba002, entTo, schemaTo }, 'oobb004Chk: 校验字段编号');
+    // v_dzeb001_2
+    const sql_dzeb_count = `
+        SELECT COUNT(*) AS cnt FROM ${schemaTo}.dzeb_t,${schemaTo}.dzac_t LEFT JOIN ${schemaTo}.gzzz_t ON dzac001 = gzzz002 
+        WHERE dzeb002 = dzac002 AND dzeb001 = dzac005 AND dzeb002 = '${ooba002}' AND gzzz001 IN (SELECT oobl002 FROM ${schemaTo}.oobl_t WHERE oobl001= '${oobb004}' AND ooblent = '${entTo}')
+        `;
+    logger.debug({ sql: sql_dzeb_count }, 'oobb004Chk: 查询字段编号');
+    const countResult = await externalDB.query(sql_dzeb_count);
+    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    if (count === 0) {
+        logger.warn({ oobb004, ooba002 }, 'oobb004Chk: 字段编号校验不通过');
+        return { table: 'oobb_t', field: 'oobb004', label: '字段编号', value: oobb004, message: `[oobb_t] 字段编号 [${oobb004}] 不存在于单据别 [${ooba002}]` };
+    }
+    logger.debug({ oobb004 }, 'oobb004Chk: 校验通过');
+    return null;
+}
+
+/** 
+ * @param oobc003  控制组编号
+ * @param oobc004  控制组类型
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @returns     校验结果
+*/
+async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ oobc003, oobc004, entTo, schemaTo }, 'oobc003Chk: 校验控制组编号');
+
+    if (oobc004 === '8') {
+        // 员工类型控制组 v_ooag001
+        const sql_ooag_count = `
+            SELECT COUNT(*) AS cnt
+            FROM ${schemaTo}.ooag_t
+            WHERE ooagent = '${entTo}'
+              AND ooag001 = '${oobc003}'
+            `;
+        logger.debug({ sql: sql_ooag_count }, 'oobc003Chk: 查询员工类型控制组');
+        const countResult = await externalDB.query(sql_ooag_count);
+        const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+        if (count === 0) {
+            logger.warn({ oobc003, oobc004: '8' }, 'oobc003Chk: 员工类型控制组编号不存在');
+            return { table: 'oobc_t', field: 'oobc003', label: '控制组编号', value: oobc003, message: `[oobc_t] 控制组编号(员工类型) [${oobc003}] 在员工数据表(ooag_t)中不存在` };
+        }
+    } else if (oobc004 === '7'){
+        // 部门类型控制组 v_ooeg001
+        const sql_ooeg_count = `
+            SELECT COUNT(*) AS cnt
+            FROM ${schemaTo}.ooeg_t
+            WHERE ooeg001 = '${oobc003}'
+              AND ooegent = '${entTo}'
+            `;
+        logger.debug({ sql: sql_ooeg_count }, 'oobc003Chk: 查询部门类型控制组');
+        const countResult = await externalDB.query(sql_ooeg_count);
+        const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+        if (count === 0) {
+            logger.warn({ oobc003, oobc004: '7' }, 'oobc003Chk: 部门类型控制组编号不存在');
+            return { table: 'oobc_t', field: 'oobc003', label: '控制组编号', value: oobc003, message: `[oobc_t] 控制组编号(部门类型) [${oobc003}] 在部门数据表(ooeg_t)中不存在` };
+        }
+    } else{
+        //  一般控制组 v_ooha001_5
+        const sql_ooha_count = `
+            SELECT COUNT(*) AS cnt
+            FROM ${schemaTo}.ooha_t
+            WHERE oohaent = '${entTo}'
+              AND ooha001 = '${oobc003}'
+              AND ooha002 = '${oobc004}'
+            `;
+        logger.debug({ sql: sql_ooha_count }, 'oobc003Chk: 查询一般类型控制组');
+        const countResult = await externalDB.query(sql_ooha_count);
+        const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+        if (count === 0) {
+            logger.warn({ oobc003, oobc004 }, 'oobc003Chk: 一般类型控制组编号不存在');
+            return { table: 'oobc_t', field: 'oobc003', label: '控制组编号', value: oobc003, message: `[oobc_t] 控制组编号(一般类型) [${oobc003}]（控制组类型 [${oobc004}]）在一般控制组表(ooha_t)中不存在` };
+        }
+    }
+    logger.debug({ oobc003, oobc004 }, 'oobc003Chk: 校验通过');
+    return null;
+}
+
+/** 
+ * @param oobd003  生命周期类型
+ * @param oobd004  生命周期编号
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @returns     校验结果
+*/
+async function oobd004Chk(oobd003: string, oobd004: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ oobd003, oobd004, entTo, schemaTo }, 'oobd004Chk: 校验生命周期编号');
+    // ACC 应用分类码
+    const sql_oocq_oobd = `
+        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oocq_t
+        WHERE oocqent = '${entTo}'
+        AND oocq001 = '${oobd003}'
+        AND oocq002 = '${oobd004}'
+        `;
+    logger.debug({ sql: sql_oocq_oobd }, 'oobd004Chk: 查询生命周期编号');
+    const countResult = await externalDB.query(sql_oocq_oobd)
+    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    if (count === 0) {
+        logger.warn({ oobd003, oobd004 }, 'oobd004Chk: 生命周期编号不存在');
+        return { table: 'oobd_t', field: 'oobd004', label: '生命周期编号', value: oobd004, message: `[oobd_t] 生命周期编号 [${oobd004}]（生命周期类型 [${oobd003}]）在应用分类码表(oocq_t)中不存在` };
+    }
+    logger.debug({ oobd003, oobd004 }, 'oobd004Chk: 校验通过');
+    return null;
+}
+
+/** 
+ * @param oobh003  产品分类
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @returns     校验结果
+*/
+async function oobh003Chk(oobh003: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ oobh003, entTo, schemaTo }, 'oobh003Chk: 校验产品分类');
+    const sql_rtax_count = `
+        SELECT COUNT(*) AS cnt FROM ${schemaTo}.rtax_t
+        WHERE rtaxent = '${entTo}'
+        AND (rtax001 = '${oobh003}' OR '${oobh003}' =' ')
+        `;
+    logger.debug({ sql: sql_rtax_count }, 'oobh003Chk: 查询产品分类');
+    const countResult = await externalDB.query(sql_rtax_count);
+    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    if (count === 0) {
+        logger.warn({ oobh003 }, 'oobh003Chk: 产品分类不存在');
+        return { table: 'oobh_t', field: 'oobh003', label: '产品分类', value: oobh003, message: `[oobh_t] 产品分类 [${oobh003}] 在产品分类表(rtax_t)中不存在` };
+    }
+    logger.debug({ oobh003 }, 'oobh003Chk: 校验通过');
+    return null;
+}
+
+/** 
+ * @param ooba002  单据别编号
+ * @param oobi003  单身理由码
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @returns     校验结果
+*/
+async function oobi003Chk(ooba002: string, oobi003: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
+    logger.debug({ ooba002, oobi003, entTo, schemaTo }, 'oobi003Chk: 校验单身理由码');
+
+    const sql_gzcb_acc = `
+        SELECT gzcb004
+        FROM ${schemaTo}.gzcb_t,${schemaTo}.oobx_t
+        WHERE gzcb001 = 24
+        AND gzcb002 = oobx003
+        AND oobx001 = '${ooba002}'
+        AND oobxent = '${entTo}'
+        `;
+    logger.debug({ sql: sql_gzcb_acc }, 'oobi003Chk: 查询单身理由码 ACC 类别');
+    const accResult = await externalDB.query(sql_gzcb_acc);
+
+    const rows = accResult.rows as Record<string, unknown>[];
+
+    if (rows.length === 0) {
+        logger.warn({ oobi003, ooba002 }, 'oobi003Chk: 单身理由码对应的应用分类码查询无结果');
+        return { table: 'oobi_t', field: 'oobi003', label: '单身理由码', value: oobi003, message: `[oobi_t] 单身理由码 [${oobi003}] 对应的应用分类码(gzcb_t)查询无结果，无法确定 ACC 类别` };
+    }
+
+    const acc = rows[0]['gzcb004'];
+
+    const sql_oocq_oobi = `
+        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oocq_t
+        WHERE oocqent = '${entTo}'
+        AND oocq001 = '${acc}'
+        AND oocq002 = '${oobi003}'
+        `;
+    logger.debug({ sql: sql_oocq_oobi }, 'oobi003Chk: 查询单身理由码是否存在');
+    const countResult = await externalDB.query(sql_oocq_oobi)
+    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    if (count === 0) {
+        logger.warn({ oobi003, acc }, 'oobi003Chk: 单身理由码在应用分类码表中不存在');
+        return { table: 'oobi_t', field: 'oobi003', label: '单身理由码', value: oobi003, message: `[oobi_t] 单身理由码 [${oobi003}]（ACC [${acc}]）在应用分类码表(oocq_t)中不存在` };
+    }
+    logger.debug({ oobi003, acc }, 'oobi003Chk: 校验通过');
+    return null;
+}
+
+/** 
+ * @param oobj003  库存标签编号
+ * @param entTo    集团代码
+ * @param schemaTo 目标集团 schema
+ * @param table    表名（默认 oobj_t）
+ * @param field    字段名（默认 oobj003）
+ * @param label    字段中文名（默认 库存标签编号F）
+ * @returns     校验结果
+*/
+async function oobj003Chk(oobj003: string, entTo: string, schemaTo: string, table = 'oobj_t', field = 'oobj003', label = '库存标签编号F'): Promise<ValidateError | null> {
+    logger.debug({ oobj003, entTo, schemaTo, table, field, label }, 'oobj003Chk: 校验库存标签编号');
+    // ACC 应用分类码
+    const sql_oocq_oobj = `
+        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oocq_t
+        WHERE oocqent = '${entTo}'
+        AND oocq001 = '220'
+        AND oocq002 = '${oobj003}'
+        `;
+    logger.debug({ sql: sql_oocq_oobj }, 'oobj003Chk: 查询库存标签编号');
+    const countResult = await externalDB.query(sql_oocq_oobj)
+    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    if (count === 0) {
+        logger.warn({ [field]: oobj003, table }, 'oobj003Chk: 库存标签编号不存在');
+        return { table, field, label, value: oobj003, message: `[${table}] ${label} [${oobj003}] 在应用分类码表(oocq_t, ACC=220)中不存在` };
+    }
+    logger.debug({ [field]: oobj003 }, 'oobj003Chk: 校验通过');
+    return null;
+}
+
+
+/**
+ * 查询指定 ENT 可用的参照表编号列表（ooal_t, ooal001=3）
+ * SELECT ooal002 FROM ${schema}.ooal_t WHERE ooal001 = 3 AND ooalent = ${ent} ORDER BY ooal002
+ */
+export async function queryOoba001List(schema: string, ent: number): Promise<string[]> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法查询参照表列表');
+    }
+
+    const sql = `SELECT ooal002 FROM ${schema}.ooal_t WHERE ooal001 = 3 AND ooalent = ${ent} ORDER BY ooal002`;
+    logger.debug({ sql, schema, ent }, '[genAooi200] queryOoba001List: 查询可用参照表');
+    const result = await externalDB.query(sql);
+    const rows = result.rows as Record<string, unknown>[];
+    const list = rows.map(row => String(row['ooal002'] ?? row['OOAL002'] ?? '')).filter(Boolean);
+    logger.info({ schema, ent, count: list.length }, '[genAooi200] queryOoba001List: 查询完成');
+    return list;
 }
