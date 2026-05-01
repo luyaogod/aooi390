@@ -26,7 +26,7 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertTitle, AlertDescription, AlertAction } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { RadioGroup } from '@/components/ui/radio-group'
@@ -65,6 +65,16 @@ function GenAooi200Page() {
   // 配置导入/导出状态
   const [exportConfigLoading, setExportConfigLoading] = useState(false)
   const [importConfigLoading, setImportConfigLoading] = useState(false)
+
+  // IC行业单据别批次设置MULTI 状态
+  const [entList, setEntList] = useState<{ gzou001: string; gzou003: string }[]>([])
+  const [entListLoading, setEntListLoading] = useState(false)
+  const [selectedEnt, setSelectedEnt] = useState('')
+  const [wfPreviewLoading, setWfPreviewLoading] = useState(false)
+  const [wfPreviewRows, setWfPreviewRows] = useState<WfOobxRow[]>([])
+  const [wfExecuteLoading, setWfExecuteLoading] = useState(false)
+  const [wfError, setWfError] = useState<string | null>(null)
+  const [wfResult, setWfResult] = useState<number | null>(null)
 
   const fetchConnections = async () => {
     setConnectionsLoading(true)
@@ -234,6 +244,80 @@ function GenAooi200Page() {
     }
   }
 
+  // IC行业单据别批次设置MULTI 事件处理
+  const handleLoadEntList = async () => {
+    setEntListLoading(true)
+    setWfError(null)
+    try {
+      const result = await window.electronAPI.aooi200QueryEnt()
+      if (result.success) {
+        setEntList(result.rows)
+        if (result.rows.length === 0) {
+          toast.warning('未查询到企业数据，请确认外部数据库已连接')
+        }
+      } else {
+        setWfError(result.error ?? '查询企业列表失败')
+        toast.error(result.error ?? '查询企业列表失败')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setWfError(msg)
+      toast.error(msg)
+    } finally {
+      setEntListLoading(false)
+    }
+  }
+
+  const handleWfPreview = async () => {
+    if (!selectedEnt) {
+      toast.error('请先选择企业')
+      return
+    }
+    setWfPreviewLoading(true)
+    setWfPreviewRows([])
+    setWfError(null)
+    setWfResult(null)
+    try {
+      const result = await window.electronAPI.aooi200QueryWfOobx(Number(selectedEnt))
+      if (result.success) {
+        setWfPreviewRows(result.rows)
+        toast.success(`查询完成，共 ${result.rows.length} 条记录`)
+      } else {
+        setWfError(result.error ?? '查询失败')
+        toast.error(result.error ?? '查询失败')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setWfError(msg)
+      toast.error(msg)
+    } finally {
+      setWfPreviewLoading(false)
+    }
+  }
+
+  const handleWfExecute = async () => {
+    if (!selectedEnt || wfPreviewRows.length === 0) return
+    setWfExecuteLoading(true)
+    setWfError(null)
+    setWfResult(null)
+    try {
+      const result = await window.electronAPI.aooi200ReplaceOoblWf(Number(selectedEnt), wfPreviewRows)
+      if (result.success) {
+        setWfResult(result.count ?? 0)
+        toast.success(`执行更新完成，共插入 ${result.count} 条记录`)
+      } else {
+        setWfError(result.error ?? '执行更新失败')
+        toast.error(result.error ?? '执行更新失败')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setWfError(msg)
+      toast.error(msg)
+    } finally {
+      setWfExecuteLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-3xl">
       <Card>
@@ -283,30 +367,41 @@ function GenAooi200Page() {
           )}
 
           {genResult && (
-            <>
-              <Alert variant="default">
-                <CheckCircle2 className="size-4" />
-                <AlertTitle>同步完成</AlertTitle>
-                <AlertDescription>共 {totalRows} 条记录</AlertDescription>
-              </Alert>
-
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>表名</TableHead>
-                    <TableHead>同步行数</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {genResult.map((r) => (
-                    <TableRow key={r.table}>
-                      <TableCell className="font-mono">{r.table}</TableCell>
-                      <TableCell>{r.count}</TableCell>
+            <Alert variant="default">
+              <CheckCircle2 className="size-4" />
+              <AlertTitle>同步完成</AlertTitle>
+              <AlertDescription>
+                共 {totalRows} 条记录
+                  <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>表名</TableHead>
+                      <TableHead>同步行数</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </>
+                  </TableHeader>
+                  <TableBody>
+                    {genResult.map((r) => (
+                      <TableRow key={r.table}>
+                        <TableCell className="font-mono">{r.table}</TableCell>
+                        <TableCell>{r.count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </AlertDescription>
+
+             <AlertAction>
+              <div className="mt-2 flex justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setGenResult(null)}
+                >
+                  好的
+                </Button>   
+              </div>           
+              </AlertAction>     
+            </Alert>
           )}
         </CardContent>
 
@@ -429,40 +524,51 @@ function GenAooi200Page() {
           )}
 
           {importedRows.length > 0 && (
-            <>
-              <Alert variant="default">
-                <CheckCircle2 className="size-4" />
-                <AlertTitle>导入完成</AlertTitle>
-                <AlertDescription>共 {importedRows.length} 条记录</AlertDescription>
-              </Alert>
-
-              <div className="max-h-80 overflow-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>单据别</TableHead>
-                      <TableHead>名称</TableHead>
-                      <TableHead>作业编号</TableHead>
-                      <TableHead>模组别</TableHead>
-                      <TableHead>单据性质</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {importedRows.map((row, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                        <TableCell className="font-mono">{row.oobx001}</TableCell>
-                        <TableCell>{row.oobxl003}</TableCell>
-                        <TableCell className="font-mono">{row.oobx004}</TableCell>
-                        <TableCell>{row.oobx002}</TableCell>
-                        <TableCell>{row.oobx003}</TableCell>
+            <Alert variant="default">
+              <CheckCircle2 className="size-4" />
+              <AlertTitle>导入完成</AlertTitle>
+              <AlertDescription>
+                共 {importedRows.length} 条记录
+                <div className="max-h-80 overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">#</TableHead>
+                        <TableHead>单据别</TableHead>
+                        <TableHead>名称</TableHead>
+                        <TableHead>作业编号</TableHead>
+                        <TableHead>模组别</TableHead>
+                        <TableHead>单据性质</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
+                    </TableHeader>
+                    <TableBody>
+                      {importedRows.map((row, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                          <TableCell className="font-mono">{row.oobx001}</TableCell>
+                          <TableCell>{row.oobxl003}</TableCell>
+                          <TableCell className="font-mono">{row.oobx004}</TableCell>
+                          <TableCell>{row.oobx002}</TableCell>
+                          <TableCell>{row.oobx003}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </AlertDescription>
+
+              <AlertAction>
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setImportedRows([])}
+                  >
+                    好的
+                  </Button>
+                </div>
+              </AlertAction>
+            </Alert>
           )}
         </CardContent>
 
@@ -488,7 +594,7 @@ function GenAooi200Page() {
               ? <Loader2 className="size-3.5 animate-spin" />
               : <FileUp className="size-3.5" />
             }
-            {importLoading ? '解析中...' : '导入'}
+            {importLoading ? '解析中...' : '导入模板'}
           </Button>
 
           <Button
@@ -504,6 +610,133 @@ function GenAooi200Page() {
             }
             {exportResultLoading ? '保存中...' : '保存结果'}
           </Button>
+        </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>IC行业单据别批次设置MULTI</CardTitle>
+          <CardDescription>查询 _wf 后缀的作业编号，批量替换单据别属性</CardDescription>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-4">
+          <Field label="选择企业">
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedEnt}
+                onValueChange={(value) => {
+                  setSelectedEnt(value)
+                  setWfPreviewRows([])
+                  setWfError(null)
+                  setWfResult(null)
+                }}
+                disabled={entList.length === 0}
+              >
+                <SelectTrigger className="w-52">
+                  <SelectValue placeholder="请先加载企业列表" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {entList.map((ent) => (
+                      <SelectItem key={ent.gzou001} value={ent.gzou001}>
+                        {ent.gzou001}{ent.gzou003 ? ` (${ent.gzou003})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLoadEntList}
+                disabled={entListLoading}
+                className="gap-1.5"
+              >
+                {entListLoading
+                  ? <Loader2 className="size-3.5 animate-spin" />
+                  : <Database className="size-3.5" />
+                }
+                {entListLoading ? '加载中...' : '加载企业'}
+              </Button>
+            </div>
+          </Field>
+
+          {wfError && (
+            <Alert variant="destructive">
+              <AlertTriangle className="size-4" />
+              <AlertTitle>操作失败</AlertTitle>
+              <AlertDescription>{wfError}</AlertDescription>
+            </Alert>
+          )}
+
+          {wfResult != null && (
+            <Alert variant="default">
+              <CheckCircle2 className="size-4" />
+              <AlertTitle>更新完成</AlertTitle>
+              <AlertDescription>共插入 {wfResult} 条记录</AlertDescription>
+            </Alert>
+          )}
+
+          {wfPreviewRows.length > 0 && (
+            <div className="max-h-96 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>单据别</TableHead>
+                    <TableHead>单据名称</TableHead>
+                    <TableHead>模组别</TableHead>
+                    <TableHead>单据性质</TableHead>
+                    <TableHead>对应作业编号</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {wfPreviewRows.map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="font-mono">{row.oobx001}</TableCell>
+                      <TableCell>{row.oobxl003}</TableCell>
+                      <TableCell>{row.oobx002}</TableCell>
+                      <TableCell>{row.oobx003}</TableCell>
+                      <TableCell className="font-mono">{row.oobx004}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+
+        <CardFooter className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleWfPreview}
+            disabled={!selectedEnt || wfPreviewLoading}
+            className="gap-1.5"
+          >
+            {wfPreviewLoading
+              ? <Loader2 className="size-3.5 animate-spin" />
+              : <Download className="size-3.5" />
+            }
+            {wfPreviewLoading ? '查询中...' : '查询预览'}
+          </Button>
+
+          {wfPreviewRows.length > 0 && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleWfExecute}
+              disabled={wfExecuteLoading}
+              className="gap-1.5"
+            >
+              {wfExecuteLoading
+                ? <Loader2 className="size-3.5 animate-spin" />
+                : <CheckCircle2 className="size-3.5" />
+              }
+              {wfExecuteLoading ? '更新中...' : '执行更新'}
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </div>

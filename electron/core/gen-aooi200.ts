@@ -793,3 +793,127 @@ export async function importConfig(filePath: string): Promise<{ table: string; c
     logger.info({ total, results }, '[genAooi200] 配置导入完成: %s', filePath);
     return results;
 }
+
+// ==================== wf Oobx 数据处理 ====================
+
+/** 外部数据库 oobx_t + oobxl_t 联查结果行 */
+export interface WfOobxRow {
+    oobx001: string;
+    oobxl003: string | null;
+    oobx004: string | null;
+    oobx003: string | null;
+    oobx002: string | null;
+}
+
+/** 单引号转义（Oracle / Kingbase 通用） */
+function esc(v: string): string {
+    return v.replace(/'/g, "''");
+}
+
+/** 在外部数据库事务中执行操作（兼容 Kingbase / Oracle） */
+async function externalTransaction<T>(fn: (exec: (sql: string) => Promise<void>) => Promise<T>): Promise<T> {
+    const dbType = externalDB.dbType;
+    if (dbType === 'kingbase') {
+        return externalDB.transactionKingbase(async (client) => {
+            return fn(async (sql) => { await client.query(sql); });
+        });
+    }
+    if (dbType === 'oracle') {
+        return externalDB.transactionOracle(async (connection) => {
+            return fn(async (sql) => { await connection.execute(sql); });
+        });
+    }
+    throw new Error(`[genAooi200] 不支持的外部数据库类型: ${dbType}`);
+}
+
+/**
+ * 从外部数据库查询符合条件的 Oobx 数据（oobx004 以 _wf 结尾）
+ * 对应 SQL：
+ *   SELECT oobx001,oobxl003,oobx004,oobx003,oobx002
+ *   FROM oobx_t
+ *   LEFT JOIN oobxl_t ON oobxlent = oobxent AND oobxl001 = oobx001 AND oobxl002 = 'zh_CN'
+ *   WHERE oobx004 <> 'MULTI'
+ *     AND oobx004 LIKE '%_wf'
+ *     AND EXISTS (SELECT * FROM gzzz_t WHERE gzzz010 = 'wf' AND gzzz006 = oobx003)
+ *     AND EXISTS (SELECT * FROM gzzz_t WHERE gzzz001 = REPLACE(oobx004, '_wf', ''))
+ *     AND oobxent = ${ent}
+ * @param ent 企业编号
+ */
+export async function queryWfOobxData(ent: number): Promise<WfOobxRow[]> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法查询 wf Oobx 数据');
+    }
+
+    const sql = `
+        SELECT oobx001, oobxl003, oobx002, oobx003, oobx004
+        FROM oobx_t
+        LEFT JOIN oobxl_t ON oobxlent = oobxent AND oobxl001 = oobx001 AND oobxl002 = 'zh_CN'
+        WHERE 1=1
+          AND oobx004 <> 'MULTI'
+          AND oobx004 LIKE '%_wf'
+          AND EXISTS (SELECT * FROM gzzz_t WHERE gzzz010 = 'wf' AND gzzz006 = oobx003)
+          AND EXISTS (SELECT * FROM gzzz_t WHERE gzzz001 = REPLACE(oobx004, '_wf', ''))
+          AND oobxent = ${ent}
+    `;
+
+    logger.debug({ sql, ent }, '[genAooi200] queryWfOobxData: 查询外部数据库');
+    const result = await externalDB.query(sql);
+    const rows = result.rows as Record<string, unknown>[];
+    logger.info({ ent, count: rows.length }, '[genAooi200] queryWfOobxData: 查询完成');
+
+    return rows.map(row => ({
+        oobx001: String(row['oobx001'] ?? ''),
+        oobxl003: row['oobxl003'] != null ? String(row['oobxl003']) : null,
+        oobx004: row['oobx004'] != null ? String(row['oobx004']) : null,
+        oobx003: row['oobx003'] != null ? String(row['oobx003']) : null,
+        oobx002: row['oobx002'] != null ? String(row['oobx002']) : null,
+    }));
+}
+
+/**
+ * 对符合条件的 Oobx 数据，先删除 oobl_t 中原有记录，再插入两条新数据
+ * （oobx004 原值 + 替换掉 "_wf" 后的值各一条）
+ * 对应 SQL：
+ *   DELETE FROM oobl_t WHERE oobxent = ${ent} AND oobl001 IN (${oobx001_list})
+ *   INSERT INTO oobl_t (oobxl001, oobxl002, oobxl003)
+ *   VALUES ('${ent}', '${oobx001}', '${oobx004}'), ('${ent}', '${oobx001}', '${oobx004_无_wf}')
+ * @param ent  企业编号
+ * @param rows 从 queryWfOobxData 返回的行
+ * @returns 插入的总行数
+ */
+export async function replaceOoblWfData(ent: number, rows: WfOobxRow[]): Promise<number> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法处理 oobl wf 数据');
+    }
+
+    if (rows.length === 0) {
+        logger.info('[genAooi200] replaceOoblWfData: 无数据，跳过');
+        return 0;
+    }
+
+    const oobx001List = Array.from(new Set(rows.map(r => r.oobx001).filter(Boolean)));
+    const inClause = oobx001List.map(v => `'${esc(v)}'`).join(', ');
+
+    // 在事务中执行 DELETE + INSERT，报错时自动回滚
+    return externalTransaction(async (exec) => {
+        const deleteSql = `DELETE FROM oobl_t WHERE oobxent = ${ent} AND oobl001 IN (${inClause})`;
+        logger.debug({ deleteSql, ent, oobx001Count: oobx001List.length }, '[genAooi200] replaceOoblWfData: 删除旧数据');
+        await exec(deleteSql);
+
+        let insertedCount = 0;
+        for (const row of rows) {
+            const oobx004 = row.oobx004 ?? '';
+            const oobx004Clean = oobx004.replace(/_wf$/, '');
+
+            for (const val of [oobx004, oobx004Clean]) {
+                const insertSql = `INSERT INTO oobl_t (oobxl001, oobxl002, oobxl003) VALUES ('${esc(String(ent))}', '${esc(row.oobx001)}', '${esc(val)}')`;
+                await exec(insertSql);
+                insertedCount++;
+            }
+        }
+
+        logger.info({ ent, deleted: oobx001List.length, inserted: insertedCount },
+            '[genAooi200] replaceOoblWfData: 处理完成');
+        return insertedCount;
+    });
+}

@@ -7,7 +7,8 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-aooi200'
-import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig } from './core/gen-aooi200'
+import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig, queryWfOobxData, replaceOoblWfData } from './core/gen-aooi200'
+import { queryEnt } from './com-query/external'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
 
@@ -449,6 +450,39 @@ ipcMain.handle('aooi200:import-config', async () => {
     return { success: true, results }
   } catch (error) {
     logger.error(error, '[Main] 导入系统配置失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// IPC: 查询外部数据库 ENT 列表
+ipcMain.handle('aooi200:query-ent', async () => {
+  try {
+    const rows = await queryEnt()
+    return { success: true, rows }
+  } catch (error) {
+    logger.error(error, '[Main] 查询ENT列表失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), rows: [] }
+  }
+})
+
+// IPC: 查询 wf Oobx 预览数据
+ipcMain.handle('aooi200:query-wf-oobx', async (_event, ent: number) => {
+  try {
+    const rows = await queryWfOobxData(ent)
+    return { success: true, rows }
+  } catch (error) {
+    logger.error(error, '[Main] 查询 wf Oobx 数据失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), rows: [] }
+  }
+})
+
+// IPC: 执行 oobl wf 数据替换（事务）
+ipcMain.handle('aooi200:replace-oobl-wf', async (_event, ent: number, rows: unknown[]) => {
+  try {
+    const count = await replaceOoblWfData(ent, rows as Parameters<typeof replaceOoblWfData>[1])
+    return { success: true, count }
+  } catch (error) {
+    logger.error(error, '[Main] 执行 oobl wf 替换失败')
     return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e 'const fs=require\\(\"fs\"\\);const c=fs.readFileSync\\(\"electron/core/gen-aooi200.ts\",\"utf8\"\\);console.log\\(\"has CR:\",c.includes\\(\"\\\\r\"\\)\\);console.log\\(\"last return results:\",c.lastIndexOf\\(\"return results;\"\\)\\);console.log\\(\"near end:\",JSON.stringify\\(c.slice\\(c.length-200\\)\\)\\);')",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
