@@ -875,8 +875,10 @@ export async function queryWfOobxData(schema: string, ent: number): Promise<WfOo
  * 对符合条件的 Oobx 数据，先删除 oobl_t 中原有记录，再插入两条新数据
  * （oobx004 原值 + 替换掉 "_wf" 后的值各一条）
  * 对应 SQL：
- *   DELETE FROM ${schema}.oobl_t WHERE oobxent = ${ent} AND oobl001 IN (${oobx001_list})
- *   INSERT INTO ${schema}.oobl_t (oobxl001, oobxl002, oobxl003)
+ *   UPDATE ${schema}.oobx_t SET oobx004 = 'MULTI' WHERE oobxent = ${ent} AND oobx001 IN (${oobx001_list})
+ * 
+ *   DELETE FROM ${schema}.oobl_t WHERE ooblent = ${ent} AND oobl001 IN (${oobx001_list})
+ *   INSERT INTO ${schema}.oobl_t (ooblent, oobl001, oobl002)
  *   VALUES ('${ent}', '${oobx001}', '${oobx004}'), ('${ent}', '${oobx001}', '${oobx004_无_wf}')
  * @param schema 数据库 schema
  * @param ent    企业编号
@@ -896,8 +898,12 @@ export async function replaceOoblWfData(schema: string, ent: number, rows: WfOob
     const oobx001List = Array.from(new Set(rows.map(r => r.oobx001).filter(Boolean)));
     const inClause = oobx001List.map(v => `'${esc(v)}'`).join(', ');
 
-    // 在事务中执行 DELETE + INSERT，报错时自动回滚
+    // 在事务中执行 UPDATE + DELETE + INSERT，报错时自动回滚
     return externalTransaction(async (exec) => {
+        const updateSql = `UPDATE ${schema}.oobx_t SET oobx004 = 'MULTI' WHERE oobxent = ${ent} AND oobx001 IN (${inClause})`;
+        logger.debug({ updateSql, schema, ent, oobx001Count: oobx001List.length }, '[genAooi200] replaceOoblWfData: 更新 oobx004 为 MULTI');
+        await exec(updateSql);
+
         const deleteSql = `DELETE FROM ${schema}.oobl_t WHERE ooblent = ${ent} AND oobl001 IN (${inClause})`;
         logger.debug({ deleteSql, schema, ent, oobx001Count: oobx001List.length }, '[genAooi200] replaceOoblWfData: 删除旧数据');
         await exec(deleteSql);
