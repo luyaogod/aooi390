@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('aooi200:restore-from-backup', schema, timestamp, ent2, ooba001, ooba002List),
   aooi200CleanBackups: (schema: string, timestamp?: number) =>
     ipcRenderer.invoke('aooi200:clean-backups', schema, timestamp),
+  aooi200ListBackups: (schema: string) => ipcRenderer.invoke('aooi200:list-backups', schema),
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
     ipcRenderer.on('aooi200:validation-progress', listener)

@@ -1369,7 +1369,57 @@ export async function cleanBackups(schema: string, timestamp?: number): Promise<
     return cleaned;
 }
 
-/** 
+/** 备份版本信息 */
+export interface BackupVersion {
+    timestamp: number;
+    tables: string[];
+}
+
+/**
+ * 列出所有备份版本
+ * 查询数据库中所有 _bck_ 表，按时间戳分组
+ * @param schema 数据库 schema
+ */
+export async function listBackupTimestamps(schema: string): Promise<BackupVersion[]> {
+    if (!externalDB.isConnected) {
+        throw new Error('[genAooi200] 外部数据库未连接，无法查看备份列表');
+    }
+
+    const dbType = externalDB.dbType;
+    let findSql: string;
+    if (dbType === 'oracle') {
+        findSql = `SELECT table_name FROM all_tables WHERE owner = UPPER('${esc(schema)}') AND table_name LIKE '%_BCK\\_%' ESCAPE '\\'`;
+    } else {
+        findSql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${esc(schema)}' AND table_name LIKE '%_bck_%'`;
+    }
+
+    const result = await externalDB.query(findSql);
+    const rows = result.rows as Record<string, unknown>[];
+
+    // 按时间戳分组
+    const groupMap = new Map<number, string[]>();
+    for (const row of rows) {
+        const tname = String(row['table_name'] ?? row['TABLE_NAME'] ?? '');
+        // 解析表名中的时间戳：xxx_bck_1234567890
+        const match = tname.match(/_bck_(\d+)$/);
+        if (match) {
+            const ts = Number(match[1]);
+            if (!groupMap.has(ts)) groupMap.set(ts, []);
+            groupMap.get(ts)!.push(tname);
+        }
+    }
+
+    const versions: BackupVersion[] = [];
+    for (const [ts, tables] of groupMap) {
+        versions.push({ timestamp: ts, tables: tables.sort() });
+    }
+    versions.sort((a, b) => b.timestamp - a.timestamp);
+
+    logger.info({ schema, count: versions.length }, '[genAooi200] listBackupTimestamps: 查询完成');
+    return versions;
+}
+
+/**
  * 检查参照表是否存在
  * @param ooba001  参照表编号
  * @param entTo    集团代码

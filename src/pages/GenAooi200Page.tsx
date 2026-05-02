@@ -92,6 +92,15 @@ function GenAooi200Page() {
   const [sourceOoba001List, setSourceOoba001List] = useState<string[]>([])
   const [targetOoba001List, setTargetOoba001List] = useState<string[]>([])
 
+  // 备份管理 状态
+  const [backupSchema, setBackupSchema] = useState('')
+  const [backupVersions, setBackupVersions] = useState<BackupVersion[]>([])
+  const [backupListLoading, setBackupListLoading] = useState(false)
+  const [restoreLoading, setRestoreLoading] = useState(false)
+  const [backupRestoreEnt, setBackupRestoreEnt] = useState('')
+  const [backupRestoreOoba001, setBackupRestoreOoba001] = useState('')
+  const [backupCleanLoading, setBackupCleanLoading] = useState(false)
+
   const sourceSchema = entList.find(e => e.gzou001 === sourceEnt)?.gzou003 ?? ''
   const targetSchema = entList.find(e => e.gzou001 === targetEnt)?.gzou003 ?? ''
 
@@ -458,6 +467,69 @@ function GenAooi200Page() {
         else setTargetOoba001List(result.list)
       }
     } catch { /* ignore */ }
+  }
+
+  // 备份管理 事件处理
+  const backupEntSchema = entList.find(e => e.gzou001 === backupSchema)?.gzou003 ?? ''
+
+  const handleListBackups = async () => {
+    if (!backupEntSchema) { toast.error('未找到对应企业的 schema'); return }
+    setBackupListLoading(true)
+    setBackupVersions([])
+    try {
+      const result = await window.electronAPI.aooi200ListBackups(backupEntSchema)
+      if (result.success) {
+        setBackupVersions(result.versions)
+        toast.success(`找到 ${result.versions.length} 个备份版本`)
+      } else {
+        toast.error(result.error ?? '查询失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBackupListLoading(false)
+    }
+  }
+
+  const handleRestoreBackup = async (timestamp: number) => {
+    if (!backupEntSchema || !backupRestoreEnt || !backupRestoreOoba001) {
+      toast.error('请填写 ENT 和参照表编号')
+      return
+    }
+    setRestoreLoading(true)
+    try {
+      const result = await window.electronAPI.aooi200RestoreFromBackup(
+        backupEntSchema, timestamp, Number(backupRestoreEnt), backupRestoreOoba001, [],
+      )
+      if (result.success) {
+        toast.success(`已恢复 ${result.restored.length} 张备份表`)
+        handleListBackups()
+      } else {
+        toast.error(result.error ?? '恢复失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setRestoreLoading(false)
+    }
+  }
+
+  const handleCleanBackup = async (timestamp?: number) => {
+    if (!backupEntSchema) { toast.error('未找到对应企业的 schema'); return }
+    setBackupCleanLoading(true)
+    try {
+      const result = await window.electronAPI.aooi200CleanBackups(backupEntSchema, timestamp)
+      if (result.success) {
+        toast.success(`已清理 ${result.cleaned.length} 张备份表`)
+        handleListBackups()
+      } else {
+        toast.error(result.error ?? '清理失败')
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBackupCleanLoading(false)
+    }
   }
 
   const toggleAllMatched = () => {
@@ -1046,6 +1118,72 @@ function GenAooi200Page() {
             </>
           )}
         </CardFooter>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>备份管理</CardTitle>
+          <CardDescription>查看、恢复或清理跨 schema 同步产生的备份数据</CardDescription>
+        </CardHeader>
+
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <Field label="目标 Schema 的 ENT">
+              <Select value={backupSchema} onValueChange={(v) => { if (!v) return; setBackupSchema(v); setBackupVersions([]) }} disabled={entList.length === 0}>
+                <SelectTrigger className="w-52"><SelectValue placeholder="选择企业" /></SelectTrigger>
+                <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            </Field>
+            <Button variant="outline" size="sm" onClick={handleListBackups} disabled={backupListLoading || !backupSchema} className="gap-1.5 mt-5">
+              {backupListLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+              {backupListLoading ? '查询中...' : '查询备份'}
+            </Button>
+          </div>
+
+          {backupVersions.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Input value={backupRestoreEnt} onChange={(e) => setBackupRestoreEnt(e.target.value)} className="w-24 font-mono" placeholder="ENT" />
+              <Input value={backupRestoreOoba001} onChange={(e) => setBackupRestoreOoba001(e.target.value)} className="w-24 font-mono" placeholder="参照表" />
+              <Button variant="outline" size="sm" onClick={() => handleCleanBackup()} disabled={backupCleanLoading} className="gap-1.5 ml-auto">
+                {backupCleanLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                清理全部
+              </Button>
+            </div>
+          )}
+
+          {backupVersions.length > 0 && (
+            <div className="max-h-96 overflow-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-40">时间戳</TableHead>
+                    <TableHead>备份表</TableHead>
+                    <TableHead className="w-32">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {backupVersions.map(v => (
+                    <TableRow key={v.timestamp}>
+                      <TableCell className="font-mono text-xs">{v.timestamp}<br /><span className="text-muted-foreground">{new Date(v.timestamp * 1000).toLocaleString()}</span></TableCell>
+                      <TableCell className="text-xs font-mono">{v.tables.join(', ')}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" onClick={() => handleRestoreBackup(v.timestamp)} disabled={restoreLoading || !backupRestoreEnt || !backupRestoreOoba001} className="gap-1 text-xs">
+                            {restoreLoading ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}
+                            应用
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleCleanBackup(v.timestamp)} disabled={backupCleanLoading} className="gap-1 text-xs">
+                            <Trash2 className="size-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
       </Card>
     </div>
   )

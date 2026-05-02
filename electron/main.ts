@@ -7,7 +7,7 @@ import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
 import { syncAooi200Service } from './core/sync-aooi200'
-import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig, queryWfOobxData, replaceOoblWfData, compareOobaRef, validateDocConfig, copyDocConfig, restoreFromBackup, cleanBackups, queryOoba001List } from './core/gen-aooi200'
+import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig, queryWfOobxData, replaceOoblWfData, compareOobaRef, validateDocConfig, copyDocConfig, restoreFromBackup, cleanBackups, queryOoba001List, listBackupTimestamps } from './core/gen-aooi200'
 import { queryEnt } from './com-query/external'
 import { paramDiffService } from './core/param-diff'
 import logger from './utils/logger'
@@ -528,6 +528,17 @@ ipcMain.handle('aooi200:restore-from-backup', async (_event, schema: string, tim
   } catch (error) {
     logger.error(error, '[Main] 从备份恢复失败')
     return { success: false, error: error instanceof Error ? error.message : String(error), restored: [] }
+  }
+})
+
+// IPC: 列出备份版本
+ipcMain.handle('aooi200:list-backups', async (_event, schema: string) => {
+  try {
+    const versions = await listBackupTimestamps(schema)
+    return { success: true, versions }
+  } catch (error) {
+    logger.error(error, '[Main] 列出备份版本失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error), versions: [] }
   }
 })
 

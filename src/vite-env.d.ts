@@ -121,6 +121,7 @@ interface ElectronAPI {
     Promise<{ success: boolean; restored: string[]; error?: string }>
   aooi200CleanBackups: (schema: string, timestamp?: number) =>
     Promise<{ success: boolean; cleaned: string[]; error?: string }>
+  aooi200ListBackups: (schema: string) => Promise<{ success: boolean; versions: BackupVersion[]; error?: string }>
   onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>
@@ -222,6 +223,11 @@ declare global {
     label: string
     value: string
     message: string
+  }
+
+  interface BackupVersion {
+    timestamp: number
+    tables: string[]
   }
 }
 
