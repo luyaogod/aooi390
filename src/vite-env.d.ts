@@ -117,7 +117,7 @@ interface ElectronAPI {
     Promise<{ success: boolean; errors: ValidateError[]; error?: string }>
   aooi200CopyDocConfig: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
     Promise<{ success: boolean; timestamp: number; results: { table: string; deleted: number; inserted: number }[]; errors: ValidateError[]; error?: string }>
-  aooi200RestoreFromBackup: (schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) =>
+  aooi200RestoreFromBackup: (schema: string, timestamp: number) =>
     Promise<{ success: boolean; restored: string[]; error?: string }>
   aooi200CleanBackups: (schema: string, timestamp?: number) =>
     Promise<{ success: boolean; cleaned: string[]; error?: string }>

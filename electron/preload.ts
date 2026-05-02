@@ -46,8 +46,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('aooi200:validate-doc-config', schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
   aooi200CopyDocConfig: (schemaFrom: string, schemaTo: string, ent1: number, ent2: number, ooba001From: string, ooba001To: string, ooba002List: string[], mode: string) =>
     ipcRenderer.invoke('aooi200:copy-doc-config', schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode),
-  aooi200RestoreFromBackup: (schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) =>
-    ipcRenderer.invoke('aooi200:restore-from-backup', schema, timestamp, ent2, ooba001, ooba002List),
+  aooi200RestoreFromBackup: (schema: string, timestamp: number) =>
+    ipcRenderer.invoke('aooi200:restore-from-backup', schema, timestamp),
   aooi200CleanBackups: (schema: string, timestamp?: number) =>
     ipcRenderer.invoke('aooi200:clean-backups', schema, timestamp),
   aooi200ListBackups: (schema: string) => ipcRenderer.invoke('aooi200:list-backups', schema),

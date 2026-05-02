@@ -521,9 +521,9 @@ ipcMain.handle('aooi200:copy-doc-config', async (_event, schemaFrom: string, sch
 })
 
 // IPC: 从备份恢复
-ipcMain.handle('aooi200:restore-from-backup', async (_event, schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[]) => {
+ipcMain.handle('aooi200:restore-from-backup', async (_event, schema: string, timestamp: number) => {
   try {
-    const restored = await restoreFromBackup(schema, timestamp, ent2, ooba001, ooba002List)
+    const restored = await restoreFromBackup(schema, timestamp)
     return { success: true, restored }
   } catch (error) {
     logger.error(error, '[Main] 从备份恢复失败')

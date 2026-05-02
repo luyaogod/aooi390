@@ -1066,14 +1066,12 @@ export async function compareOobaRef(
     return { matched, onlyEnt1, onlyEnt2 };
 }
 
-/** 在外部数据库建表备份数据（DDL，Oracle 下会隐式提交） */
+/** 在外部数据库整表备份（DDL，Oracle 下会隐式提交） */
 async function createBackupTable(
-    schema: string, table: string, ts: number, ent: number, ooba001: string, ooba002List: string[],
+    schema: string, table: string, ts: number,
 ): Promise<string> {
     const backupTable = `${table}_bck_${ts}`;
-    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
-    const t = docConfigTables.find(c => c.table === table)!;
-    const sql = `CREATE TABLE ${schema}.${backupTable} AS SELECT * FROM ${schema}.${table} WHERE ${t.entCol} = ${ent} AND ${t.refCol} = '${esc(ooba001)}' AND ${t.docCol} IN (${inClause})`;
+    const sql = `CREATE TABLE ${schema}.${backupTable} AS SELECT * FROM ${schema}.${table}`;
     logger.debug({ sql }, '[genAooi200] createBackupTable: %s', backupTable);
     await externalDB.query(sql);
     return backupTable;
@@ -1196,13 +1194,13 @@ export async function copyDocConfig(
     const ts = Math.floor(Date.now() / 1000);
     const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
 
-    // Step 1: 创建备份表（备份 schemaTo.ent2 在 ooba001To 下的现有数据，DDL 自动提交）
+    // Step 1: 整表备份（备份 schemaTo 下全部配置表数据，DDL 自动提交）
     const backedUpTables: string[] = [];
     for (const { table } of docConfigTables) {
-        const bt = await createBackupTable(schemaTo, table, ts, ent2, ooba001To, ooba002List);
+        const bt = await createBackupTable(schemaTo, table, ts);
         backedUpTables.push(bt);
     }
-    logger.info({ schemaTo, ent2, ooba001To, ts, tables: backedUpTables }, '[genAooi200] copyDocConfig: 备份表创建完成');
+    logger.info({ schemaTo, ts, tables: backedUpTables }, '[genAooi200] copyDocConfig: 备份表创建完成');
 
     // Step 2: 校验 schemaFrom.ent1 源数据在 schemaTo.ent2 环境中的合法性
     const errors = await validateDocConfig(schemaFrom, schemaTo, ent1, ent2, ooba001From, ooba001To, ooba002List, mode);
@@ -1241,6 +1239,7 @@ export async function copyDocConfig(
                     const v = row[c.toLowerCase()] ?? row[c.toUpperCase()] ?? row[c];
                     if (v === null || v === undefined) return 'NULL';
                     if (typeof v === 'number') return String(v);
+                    if (v instanceof Date) return `'${v.toISOString()}'`;
                     return `'${esc(String(v))}'`;
                 }).join(', ');
                 const insertSql = `INSERT INTO ${schemaTo}.${table} (${colList}) VALUES (${valList})`;
@@ -1261,25 +1260,21 @@ export async function copyDocConfig(
 }
 
 /**
- * 从备份表恢复数据
- * 将备份表数据回写到原表（清空当前数据后插入）
+ * 从备份表整表恢复数据
+ * 先清空原表 → 从备份表回插全部数据 → 删除备份表
  * @param schema      数据库 schema
  * @param timestamp   备份时间戳
- * @param ent2        目标企业编号
- * @param ooba001     参照表编号
- * @param ooba002List 单据别列表（用于匹配要恢复的行范围）
  */
 export async function restoreFromBackup(
-    schema: string, timestamp: number, ent2: number, ooba001: string, ooba002List: string[],
+    schema: string, timestamp: number,
 ): Promise<string[]> {
     if (!externalDB.isConnected) {
         throw new Error('[genAooi200] 外部数据库未连接，无法从备份恢复');
     }
 
-    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
     const restored: string[] = [];
 
-    for (const { table, entCol, refCol, docCol } of docConfigTables) {
+    for (const { table } of docConfigTables) {
         const backupTable = `${table}_bck_${timestamp}`;
 
         // 检查备份表是否存在
@@ -1291,15 +1286,8 @@ export async function restoreFromBackup(
         }
 
         await externalTransaction(async (exec) => {
-            // 删除当前数据
-            const deleteSql = `DELETE FROM ${schema}.${table} WHERE ${entCol} = ${ent2} AND ${refCol} = '${esc(ooba001)}' AND ${docCol} IN (${inClause})`;
-            await exec(deleteSql);
-
-            // 从备份表插回
-            const insertSql = `INSERT INTO ${schema}.${table} SELECT * FROM ${schema}.${backupTable}`;
-            await exec(insertSql);
-
-            // 删除备份表
+            await exec(`DELETE FROM ${schema}.${table}`);
+            await exec(`INSERT INTO ${schema}.${table} SELECT * FROM ${schema}.${backupTable}`);
             await exec(`DROP TABLE ${schema}.${backupTable}`);
         });
 
@@ -1484,7 +1472,7 @@ async function oobb004Chk(oobb004: string, ooba002: string, entTo: string, schem
     // v_dzeb001_2
     const sql_dzeb_count = `
         SELECT COUNT(*) AS cnt FROM ${schemaTo}.dzeb_t,${schemaTo}.dzac_t LEFT JOIN ${schemaTo}.gzzz_t ON dzac001 = gzzz002 
-        WHERE dzeb002 = dzac002 AND dzeb001 = dzac005 AND dzeb002 = '${ooba002}' AND gzzz001 IN (SELECT oobl002 FROM ${schemaTo}.oobl_t WHERE oobl001= '${oobb004}' AND ooblent = '${entTo}')
+        WHERE dzeb002 = dzac002 AND dzeb001 = dzac005 AND dzeb002 = '${oobb004}' AND gzzz001 IN (SELECT oobl002 FROM ${schemaTo}.oobl_t WHERE oobl001= '${ooba002}' AND ooblent = '${entTo}')
         `;
     logger.debug({ sql: sql_dzeb_count }, 'oobb004Chk: 查询字段编号');
     const countResult = await externalDB.query(sql_dzeb_count);

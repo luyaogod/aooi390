@@ -97,8 +97,6 @@ function GenAooi200Page() {
   const [backupVersions, setBackupVersions] = useState<BackupVersion[]>([])
   const [backupListLoading, setBackupListLoading] = useState(false)
   const [restoreLoading, setRestoreLoading] = useState(false)
-  const [backupRestoreEnt, setBackupRestoreEnt] = useState('')
-  const [backupRestoreOoba001, setBackupRestoreOoba001] = useState('')
   const [backupCleanLoading, setBackupCleanLoading] = useState(false)
 
   const sourceSchema = entList.find(e => e.gzou001 === sourceEnt)?.gzou003 ?? ''
@@ -492,15 +490,10 @@ function GenAooi200Page() {
   }
 
   const handleRestoreBackup = async (timestamp: number) => {
-    if (!backupEntSchema || !backupRestoreEnt || !backupRestoreOoba001) {
-      toast.error('请填写 ENT 和参照表编号')
-      return
-    }
+    if (!backupEntSchema) { toast.error('未找到对应企业的 schema'); return }
     setRestoreLoading(true)
     try {
-      const result = await window.electronAPI.aooi200RestoreFromBackup(
-        backupEntSchema, timestamp, Number(backupRestoreEnt), backupRestoreOoba001, [],
-      )
+      const result = await window.electronAPI.aooi200RestoreFromBackup(backupEntSchema, timestamp)
       if (result.success) {
         toast.success(`已恢复 ${result.restored.length} 张备份表`)
         handleListBackups()
@@ -1141,10 +1134,8 @@ function GenAooi200Page() {
           </div>
 
           {backupVersions.length > 0 && (
-            <div className="flex items-center gap-2">
-              <Input value={backupRestoreEnt} onChange={(e) => setBackupRestoreEnt(e.target.value)} className="w-24 font-mono" placeholder="ENT" />
-              <Input value={backupRestoreOoba001} onChange={(e) => setBackupRestoreOoba001(e.target.value)} className="w-24 font-mono" placeholder="参照表" />
-              <Button variant="outline" size="sm" onClick={() => handleCleanBackup()} disabled={backupCleanLoading} className="gap-1.5 ml-auto">
+            <div className="flex items-center justify-end">
+              <Button variant="outline" size="sm" onClick={() => handleCleanBackup()} disabled={backupCleanLoading} className="gap-1.5">
                 {backupCleanLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
                 清理全部
               </Button>
@@ -1168,7 +1159,7 @@ function GenAooi200Page() {
                       <TableCell className="text-xs font-mono">{v.tables.join(', ')}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
-                          <Button variant="outline" size="sm" onClick={() => handleRestoreBackup(v.timestamp)} disabled={restoreLoading || !backupRestoreEnt || !backupRestoreOoba001} className="gap-1 text-xs">
+                          <Button variant="outline" size="sm" onClick={() => handleRestoreBackup(v.timestamp)} disabled={restoreLoading} className="gap-1 text-xs">
                             {restoreLoading ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />}
                             应用
                           </Button>
