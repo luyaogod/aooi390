@@ -268,7 +268,7 @@ function SettingsPage() {
   const isAlreadyActive = selectedName === activeConfig?.name
 
   return (
-    <div className="flex flex-col gap-6 max-w-2xl">
+    <div className="flex flex-col gap-6 max-w-3xl">
       {/* SQLite 本地数据库卡片 */}
       <Card>
         <CardHeader>

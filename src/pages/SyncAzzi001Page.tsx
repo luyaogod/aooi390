@@ -134,7 +134,7 @@ function SyncAzzi001Page() {
       {/* ENT 参数配置卡片 */}
       <Card>
         <CardHeader>
-          <CardTitle>同步流程图</CardTitle>
+          <CardTitle>目录流程图同步</CardTitle>
           <CardDescription>将一个ENT中的目录以及流程图数据同步到另一个ENT</CardDescription>
         </CardHeader>
 
