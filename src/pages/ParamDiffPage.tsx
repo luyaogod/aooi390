@@ -120,7 +120,7 @@ function buildCompareRows(mapA: Map<string, ParamRow>, mapB: Map<string, ParamRo
 // ==================== 组件 ====================
 
 function ParamDiffPage() {
-  const [entList, setEntList] = useState<number[]>([])
+  const [entList, setEntList] = useState<{ gzou001: string; gzou003: string }[]>([])
   const [entListLoading, setEntListLoading] = useState(true)
 
   // === 集团级参数 ===
@@ -146,9 +146,9 @@ function ParamDiffPage() {
   const fetchEntList = async () => {
     setEntListLoading(true)
     try {
-      const result = await window.electronAPI.getAooi200EntList()
+      const result = await window.electronAPI.aooi200QueryEnt()
       if (result.success) {
-        setEntList(result.entList)
+        setEntList(result.rows)
       }
     } catch (err) {
       console.error('获取ENT列表失败:', err)
@@ -330,8 +330,8 @@ function ParamDiffPage() {
       {/* 集团级参数对比卡片 */}
       <Card>
         <CardHeader>
-          <CardTitle>集团级参数对比</CardTitle>
-          <CardDescription>对比两个集团的 E-COM 参数值是否一致</CardDescription>
+          <CardTitle>企业层级参数对比</CardTitle>
+          <CardDescription>对比两个集团(ENT)的在作业aoos010中设置 E-COM 参数值是否一致</CardDescription>
           {entCompareRows && (
             <CardAction>
               <Badge
@@ -354,36 +354,36 @@ function ParamDiffPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              <Field label="集团 A">
+              <Field label="ENT A">
                 <Select
                   value={entA}
                   onValueChange={(value) => { if (value) setEntA(value); setEntCompareRows(null) }}
                 >
-                  <SelectTrigger className="w-60">
-                    <SelectValue placeholder="选择集团 A" />
+                  <SelectTrigger className="w-52">
+                    <SelectValue placeholder="选择ENT A" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       {entList.map((ent) => (
-                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                        <SelectItem key={ent.gzou001} value={ent.gzou001}>{ent.gzou001}</SelectItem>
                       ))}
                     </SelectGroup>
                   </SelectContent>
                 </Select>
               </Field>
 
-              <Field label="集团 B">
+              <Field label="ENT B">
                 <Select
                   value={entB}
                   onValueChange={(value) => { if (value) setEntB(value); setEntCompareRows(null) }}
                 >
-                  <SelectTrigger className="w-60">
-                    <SelectValue placeholder="选择集团 B" />
+                  <SelectTrigger className="w-52">
+                    <SelectValue placeholder="选择ENT B" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
                       {entList.map((ent) => (
-                        <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                        <SelectItem key={ent.gzou001} value={ent.gzou001}>{ent.gzou001}</SelectItem>
                       ))}
                     </SelectGroup>
                   </SelectContent>
@@ -415,8 +415,8 @@ function ParamDiffPage() {
       {/* 据点级参数对比卡片 */}
       <Card>
         <CardHeader>
-          <CardTitle>据点级参数对比</CardTitle>
-          <CardDescription>对比两个集团下不同据点的参数值是否一致</CardDescription>
+          <CardTitle>营运据点参数对比</CardTitle>
+          <CardDescription>对比两个营运据点在作业aoos020中设置的参数值是否一致</CardDescription>
           {siteCompareRows && (
             <CardAction>
               <Badge
@@ -440,13 +440,13 @@ function ParamDiffPage() {
           ) : (
             <div className="flex flex-col gap-4">
               <div className="flex gap-4">
-                <Field label="集团 A">
+                <Field label="ENT A">
                   <Select
                     value={entA2}
                     onValueChange={(value) => { if (value) setEntA2(value); setSiteCompareRows(null) }}
                   >
-                    <SelectTrigger className="w-60">
-                      <SelectValue placeholder="选择集团 A" />
+                    <SelectTrigger className="w-52">
+                      <SelectValue placeholder="选择ENT A" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -464,8 +464,8 @@ function ParamDiffPage() {
                     onValueChange={(value) => { if (value) setSiteA(value); setSiteCompareRows(null) }}
                     disabled={sitesA.length === 0}
                   >
-                    <SelectTrigger className="w-60">
-                      <SelectValue placeholder={sitesA.length === 0 ? '请先选择集团' : '选择据点 A'} />
+                    <SelectTrigger className="w-52">
+                      <SelectValue placeholder={sitesA.length === 0 ? '请先选择ENT' : '选择据点 A'} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -479,13 +479,13 @@ function ParamDiffPage() {
               </div>
 
               <div className="flex gap-4">
-                <Field label="集团 B">
+                <Field label="ENT B">
                   <Select
                     value={entB2}
                     onValueChange={(value) => { if (value) setEntB2(value); setSiteCompareRows(null) }}
                   >
-                    <SelectTrigger className="w-60">
-                      <SelectValue placeholder="选择集团 B" />
+                    <SelectTrigger className="w-52">
+                      <SelectValue placeholder="选择ENT B" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -503,8 +503,8 @@ function ParamDiffPage() {
                     onValueChange={(value) => { if (value) setSiteB(value); setSiteCompareRows(null) }}
                     disabled={sitesB.length === 0}
                   >
-                    <SelectTrigger className="w-60">
-                      <SelectValue placeholder={sitesB.length === 0 ? '请先选择集团' : '选择据点 B'} />
+                    <SelectTrigger className="w-52">
+                      <SelectValue placeholder={sitesB.length === 0 ? '请先选择ENT' : '选择据点 B'} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>

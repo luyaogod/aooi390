@@ -6,7 +6,6 @@ import { getSqliteDBPath } from './utils/paths'
 import { dbConnectionManager } from './config/db-connections'
 import { t100GlobalManager } from './config/t100-global'
 import { syncAzzi001Service } from './core/sync-azzi001'
-import { syncAooi200Service } from './core/sync-aooi200'
 import { genAooi200, cleanSqliteTables, switchExternalConnection, exportAooi200Template, importAooi200Template, exportAooi200Result, exportAooi200Result2, exportConfig, importConfig, queryWfOobxData, replaceOoblWfData, compareOobaRef, validateDocConfig, copyDocConfig, restoreFromBackup, cleanBackups, queryOoba001List, listBackupTimestamps } from './core/gen-aooi200'
 import { queryEnt } from './com-query/external'
 import { paramDiffService } from './core/param-diff'
@@ -223,90 +222,6 @@ ipcMain.handle('azzi001:sync-all', async (_event, sourceEnt: number, targetEnt: 
     return {
       success: false,
       results: [],
-      message: error instanceof Error ? error.message : String(error),
-    }
-  }
-})
-
-// IPC: 获取Aooi200 ENT编号列表
-ipcMain.handle('aooi200:get-ent-list', async () => {
-  try {
-    const entList = await syncAooi200Service.getEntList()
-    return { success: true, entList }
-  } catch (error) {
-    logger.error(error, '[Main] 获取Aooi200 ENT列表失败')
-    return { success: false, error: String(error), entList: [] }
-  }
-})
-
-// IPC: 获取Aooi200参照表编号列表
-ipcMain.handle('aooi200:get-ooba001-list', async (_event, ent: number) => {
-  try {
-    const ooba001List = await syncAooi200Service.getOoba001List(ent)
-    return { success: true, ooba001List }
-  } catch (error) {
-    logger.error(error, '[Main] 获取Aooi200参照表编号列表失败')
-    return { success: false, error: String(error), ooba001List: [] }
-  }
-})
-
-// IPC: 获取系统分类码选项
-ipcMain.handle('aooi200:get-scc-options', async (_event, scc: string) => {
-  try {
-    const rows = await syncAooi200Service.getSccOptions(scc)
-    return { success: true, rows }
-  } catch (error) {
-    logger.error(error, '[Main] 获取SCC选项失败')
-    return { success: false, rows: [], error: error instanceof Error ? error.message : String(error) }
-  }
-})
-
-// IPC: 执行Aooi199校验（单据别字段校验）
-ipcMain.handle('aooi200:validate-aooi199', async (event, entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => {
-  try {
-    const onProgress = (current: number, total: number) => {
-      event.sender.send('aooi200:validation-progress', { current, total })
-    }
-    const result = await syncAooi200Service.runValidateAooi199(entFrom, entTo, dlang, mode as 'collect' | 'failFast', oobx006, recalculate, onProgress)
-    return result
-  } catch (error) {
-    logger.error(error, '[Main] Aooi199校验失败')
-    return {
-      success: false,
-      errors: [],
-      message: error instanceof Error ? error.message : String(error),
-    }
-  }
-})
-
-// IPC: 执行Aooi200校验
-ipcMain.handle('aooi200:validate-aooi200', async (event, entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => {
-  try {
-    const onProgress = (current: number, total: number) => {
-      event.sender.send('aooi200:validation-progress', { current, total })
-    }
-    const result = await syncAooi200Service.runValidateAooi200(entFrom, entTo, dlang, ooba001, mode as 'collect' | 'failFast', onProgress)
-    return result
-  } catch (error) {
-    logger.error(error, '[Main] Aooi200校验失败')
-    return {
-      success: false,
-      errors: [],
-      message: error instanceof Error ? error.message : String(error),
-    }
-  }
-})
-
-// IPC: 执行Aooi200 E-COM 参数检查
-ipcMain.handle('aooi200:ecom-check', async (_event, entFrom: string, entTo: string) => {
-  try {
-    const result = await syncAooi200Service.runEcomCheck(entFrom, entTo)
-    return result
-  } catch (error) {
-    logger.error(error, '[Main] Aooi200 E-COM 参数检查失败')
-    return {
-      success: false,
-      errors: [],
       message: error instanceof Error ? error.message : String(error),
     }
   }

@@ -17,13 +17,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   azzi001Preview: (sourceEnt: number) => ipcRenderer.invoke('azzi001:preview', sourceEnt),
   azzi001SyncAll: (sourceEnt: number, targetEnt: number) => ipcRenderer.invoke('azzi001:sync-all', sourceEnt, targetEnt),
 
-  // Aooi200 校验 API
-  getAooi200EntList: () => ipcRenderer.invoke('aooi200:get-ent-list'),
-  getAooi200Ooba001List: (ent: number) => ipcRenderer.invoke('aooi200:get-ooba001-list', ent),
-  aooi200EcomCheck: (entFrom: string, entTo: string) => ipcRenderer.invoke('aooi200:ecom-check', entFrom, entTo),
-  getAooi200SccOptions: (scc: string) => ipcRenderer.invoke('aooi200:get-scc-options', scc),
-  aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => ipcRenderer.invoke('aooi200:validate-aooi199', entFrom, entTo, dlang, mode, oobx006, recalculate),
-  aooi200ValidateAooi200: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => ipcRenderer.invoke('aooi200:validate-aooi200', entFrom, entTo, dlang, ooba001, mode),
   aooi200SwitchConnection: (connectionName: string) => ipcRenderer.invoke('aooi200:switch-connection', connectionName),
   aooi200CleanSqlite: () => ipcRenderer.invoke('aooi200:clean-sqlite'),
   aooi200GenData: (connectionName?: string) => ipcRenderer.invoke('aooi200:gen-data', connectionName),
@@ -51,11 +44,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aooi200CleanBackups: (schema: string, timestamp?: number) =>
     ipcRenderer.invoke('aooi200:clean-backups', schema, timestamp),
   aooi200ListBackups: (schema: string) => ipcRenderer.invoke('aooi200:list-backups', schema),
-  onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, data: { current: number; total: number }) => callback(data)
-    ipcRenderer.on('aooi200:validation-progress', listener)
-    return () => { ipcRenderer.removeListener('aooi200:validation-progress', listener) }
-  },
 
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => ipcRenderer.invoke('param-diff:enterprise-params', ent, dlang),

@@ -4,7 +4,18 @@ import { externalDB, appDB } from '../db/clients';
 import logger from '../utils/logger';
 import { dbConnectionManager } from '../config/db-connections';
 import { Oobx } from '@prisma/client';
-import { ValidateError, ValidateMode } from './sync-aooi200';
+
+/** 校验错误信息 */
+export interface ValidateError {
+    table: string;
+    field: string;
+    label: string;
+    value: string;
+    message: string;
+}
+
+/** 校验模式：collect-收集所有错误 | failFast-遇错即停 */
+export type ValidateMode = 'collect' | 'failFast';
 
 
 

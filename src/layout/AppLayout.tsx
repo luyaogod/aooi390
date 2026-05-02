@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import {
-  GitBranch,
-  ShieldCheck,
+  FolderUp,
+  GitMerge,
   Settings,
-  ArrowLeftRight,
-  Database,
+  GitCompare,
+  ArrowUpFromLine
+
 } from 'lucide-react'
 
 interface NavItem {
@@ -21,22 +22,22 @@ const navItems: NavItem[] = [
   {
     path: '/sync-azzi001',
     label: '同步流程图',
-    icon: <GitBranch className="size-4" />,
-  },
-  {
-    path: '/sync-aooi200',
-    label: '单据别校验',
-    icon: <ShieldCheck className="size-4" />,
+    icon: <GitMerge className="size-4" />,
   },
   {
     path: '/gen-aooi200',
-    label: '单据管制表',
-    icon: <Database className="size-4" />,
+    label: '单据别导入',
+    icon: <ArrowUpFromLine className="size-4" />,
+  },
+  {
+    path: '/sync-aooi200',
+    label: '单据别参数同步',
+    icon: <GitMerge className="size-4" />,
   },
   {
     path: '/param-diff',
-    label: '参数对比',
-    icon: <ArrowLeftRight className="size-4" />,
+    label: '系统参数对比',
+    icon: <GitCompare className="size-4" />,
   },
   {
     path: '/settings',

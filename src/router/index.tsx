@@ -1,8 +1,8 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import AppLayout from '../layout/AppLayout'
 import SyncAzzi001Page from '../pages/SyncAzzi001Page'
-import SyncAooi200Page from '../pages/SyncAooi200Page'
 import GenAooi200Page from '../pages/GenAooi200Page'
+import SyncAooi200Page from '../pages/SyncAooi200Page'
 import ParamDiffPage from '../pages/ParamDiffPage'
 import SettingsPage from '../pages/SettingsPage'
 
@@ -11,8 +11,8 @@ function PageCache() {
 
   const pages = [
     { path: '/sync-azzi001', element: <SyncAzzi001Page /> },
-    { path: '/sync-aooi200', element: <SyncAooi200Page /> },
     { path: '/gen-aooi200', element: <GenAooi200Page /> },
+    { path: '/sync-aooi200', element: <SyncAooi200Page /> },
     { path: '/param-diff', element: <ParamDiffPage /> },
     { path: '/settings', element: <SettingsPage /> },
   ]

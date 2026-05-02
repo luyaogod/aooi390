@@ -135,7 +135,7 @@ function SyncAzzi001Page() {
       <Card>
         <CardHeader>
           <CardTitle>同步流程图</CardTitle>
-          <CardDescription>将外部数据库中指定 ENT 的数据复制为目标 ENT（批量操作）</CardDescription>
+          <CardDescription>将一个ENT中的目录以及流程图数据同步到另一个ENT</CardDescription>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4">

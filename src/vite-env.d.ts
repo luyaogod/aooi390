@@ -93,12 +93,6 @@ interface ElectronAPI {
   getAzzi001List: () => Promise<{ success: boolean; entList: number[]; error?: string }>
   azzi001Preview: (sourceEnt: number) => Promise<{ success: boolean; preview: Azzi001SyncPreview[]; error?: string }>
   azzi001SyncAll: (sourceEnt: number, targetEnt: number) => Promise<Azzi001SyncAllResult>
-  getAooi200EntList: () => Promise<{ success: boolean; entList: number[]; error?: string }>
-  getAooi200Ooba001List: (ent: number) => Promise<{ success: boolean; ooba001List: string[]; error?: string }>
-  aooi200EcomCheck: (entFrom: string, entTo: string) => Promise<Aooi200ValidateResult>
-  getAooi200SccOptions: (scc: string) => Promise<{ success: boolean; rows: Record<string, string>[]; error?: string }>
-  aooi200ValidateAooi199: (entFrom: string, entTo: string, dlang: string, mode: string, oobx006?: string, recalculate?: boolean) => Promise<Aooi200ValidateResult>
-  aooi200ValidateAooi200: (entFrom: string, entTo: string, dlang: string, ooba001: string, mode: string) => Promise<Aooi200ValidateResult>
   aooi200SwitchConnection: (connectionName: string) => Promise<{ success: boolean; error?: string }>
   aooi200CleanSqlite: () => Promise<{ success: boolean; error?: string }>
   aooi200GenData: (connectionName?: string) => Promise<{ success: boolean; results: { table: string; count: number }[]; error?: string }>
@@ -122,7 +116,6 @@ interface ElectronAPI {
   aooi200CleanBackups: (schema: string, timestamp?: number) =>
     Promise<{ success: boolean; cleaned: string[]; error?: string }>
   aooi200ListBackups: (schema: string) => Promise<{ success: boolean; versions: BackupVersion[]; error?: string }>
-  onAooi200ValidationProgress: (callback: (data: { current: number; total: number }) => void) => () => void
   // 参数差异查询 API
   getEnterpriseParams: (ent: string, dlang: string) => Promise<{ success: boolean; rows: EnterpriseParamRow[]; error?: string }>
   getSiteParams: (ent: string, site: string, dlang: string) => Promise<{ success: boolean; rows: SiteParamRow[]; error?: string }>
@@ -140,20 +133,6 @@ interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI: ElectronAPI
-  }
-
-  interface Aooi200ValidateError {
-    table: string
-    field: string
-    label: string
-    value: string
-    message: string
-  }
-
-  interface Aooi200ValidateResult {
-    success: boolean
-    errors: Aooi200ValidateError[]
-    message: string
   }
 
   interface EnterpriseParamRow {
