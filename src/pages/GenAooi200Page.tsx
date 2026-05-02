@@ -997,34 +997,7 @@ function GenAooi200Page() {
             </Alert>
           )}
 
-          {syncResult && (
-            <Alert variant="default">
-              <CheckCircle2 className="size-4" />
-              <AlertTitle>同步完成（备份 ts={syncResult.timestamp}）</AlertTitle>
-              <AlertDescription>
-                <Table>
-                  <TableHeader><TableRow><TableHead>表名</TableHead><TableHead>删除</TableHead><TableHead>插入</TableHead></TableRow></TableHeader>
-                  <TableBody>{syncResult.results.map(r => <TableRow key={r.table}><TableCell className="font-mono">{r.table}</TableCell><TableCell>{r.deleted}</TableCell><TableCell>{r.inserted}</TableCell></TableRow>)}</TableBody>
-                </Table>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {validateErrors.length > 0 && (
-            <Alert variant="destructive">
-              <AlertTriangle className="size-4" />
-              <AlertTitle>校验错误（共 {validateErrors.length} 项）</AlertTitle>
-              <AlertDescription>
-                <div className="max-h-60 overflow-auto rounded-md border">
-                  <Table>
-                    <TableHeader><TableRow><TableHead>表</TableHead><TableHead>字段</TableHead><TableHead>值</TableHead><TableHead>错误描述</TableHead></TableRow></TableHeader>
-                    <TableBody>{validateErrors.map((e, i) => <TableRow key={i}><TableCell className="font-mono text-xs">{e.table}</TableCell><TableCell>{e.label}</TableCell><TableCell className="font-mono text-xs">{e.value}</TableCell><TableCell className="text-xs">{e.message}</TableCell></TableRow>)}</TableBody>
-                  </Table>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
+          {/* 查询结果 */}
           {compareResult && (
             <>
               <div className="text-sm text-muted-foreground">
@@ -1089,6 +1062,48 @@ function GenAooi200Page() {
                 </details>
               )}
             </>
+          )}
+
+          {/* 校验结果 */}
+          {validateErrors.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="size-4" />
+              <AlertTitle>校验错误（共 {validateErrors.length} 项）</AlertTitle>
+              <AlertDescription>
+                <div className="max-h-60 overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>表</TableHead><TableHead>字段</TableHead><TableHead>值</TableHead><TableHead>错误描述</TableHead></TableRow></TableHeader>
+                    <TableBody>{validateErrors.map((e, i) => <TableRow key={i}><TableCell className="font-mono text-xs">{e.table}</TableCell><TableCell>{e.label}</TableCell><TableCell className="font-mono text-xs">{e.value}</TableCell><TableCell className="text-xs">{e.message}</TableCell></TableRow>)}</TableBody>
+                  </Table>
+                </div>
+              </AlertDescription>
+              <AlertAction>
+                <div className="mt-2 flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setValidateErrors([])}>好的</Button>
+                </div>
+              </AlertAction>
+            </Alert>
+          )}
+
+          {/* 同步结果 */}
+          {syncResult && (
+            <Alert variant="default">
+              <CheckCircle2 className="size-4" />
+              <AlertTitle>同步完成（备份 ts={syncResult.timestamp}）</AlertTitle>
+              <AlertDescription>
+                <div className="max-h-60 overflow-auto rounded-md border">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>表名</TableHead><TableHead>删除</TableHead><TableHead>插入</TableHead></TableRow></TableHeader>
+                    <TableBody>{syncResult.results.map(r => <TableRow key={r.table}><TableCell className="font-mono">{r.table}</TableCell><TableCell>{r.deleted}</TableCell><TableCell>{r.inserted}</TableCell></TableRow>)}</TableBody>
+                  </Table>
+                </div>
+              </AlertDescription>
+              <AlertAction>
+                <div className="mt-2 flex justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setSyncResult(null)}>好的</Button>
+                </div>
+              </AlertAction>
+            </Alert>
           )}
         </CardContent>
 
