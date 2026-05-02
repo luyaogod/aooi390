@@ -229,9 +229,9 @@ function convertRow(row: Record<string, unknown>, fieldMap: Record<string, Field
                 converted[key] = Number.isNaN(Number(raw)) ? null : Number(raw);
                 break;
             case 'DateTime':
-                converted[key] = new Date(raw as string);
-                if ((converted[key] as Date).toString() === 'Invalid Date') {
-                    converted[key] = null;
+                {
+                    const d = new Date(raw as string);
+                    converted[key] = d.toString() === 'Invalid Date' ? null : d.toISOString();
                 }
                 break;
             case 'Boolean':
@@ -244,7 +244,8 @@ function convertRow(row: Record<string, unknown>, fieldMap: Record<string, Field
                 converted[key] = String(raw);
                 break;
             case 'Json':
-                converted[key] = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                // 保持字符串形态，SQLite 只接受可绑定的基本类型
+                converted[key] = typeof raw === 'string' ? raw : JSON.stringify(raw);
                 break;
             default:
                 // String, Bytes
