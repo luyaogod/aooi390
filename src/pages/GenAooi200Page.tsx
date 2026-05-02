@@ -86,6 +86,7 @@ function GenAooi200Page() {
   const [selectedOoba002, setSelectedOoba002] = useState<Set<string>>(new Set())
   const [validateLoading, setValidateLoading] = useState(false)
   const [validateErrors, setValidateErrors] = useState<ValidateError[]>([])
+  const [validationPassed, setValidationPassed] = useState(false)
   const [syncLoading, setSyncLoading] = useState(false)
   const [syncResult, setSyncResult] = useState<{ timestamp: number; results: { table: string; deleted: number; inserted: number }[] } | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -360,6 +361,7 @@ function GenAooi200Page() {
     setCompareResult(null)
     setSelectedOoba002(new Set())
     setValidateErrors([])
+    setValidationPassed(false)
     setSyncResult(null)
     setSyncError(null)
     try {
@@ -398,6 +400,7 @@ function GenAooi200Page() {
       )
       if (result.success) {
         setValidateErrors(result.errors)
+        setValidationPassed(result.errors.length === 0)
         if (result.errors.length === 0) {
           toast.success('校验全部通过')
         } else {
@@ -431,6 +434,7 @@ function GenAooi200Page() {
         setSyncResult({ timestamp: result.timestamp, results: result.results })
         if (result.errors.length > 0) {
           setValidateErrors(result.errors)
+          setValidationPassed(false)
           toast.warning(`校验不通过，共 ${result.errors.length} 项错误，已跳过同步（备份表 ts=${result.timestamp} 已保留）`)
         } else {
           const total = result.results.reduce((s: number, r: { inserted: number }) => s + r.inserted, 0)
@@ -962,31 +966,36 @@ function GenAooi200Page() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-4">
             <Field label="来源 ENT">
-              <Select value={sourceEnt} onValueChange={(v) => { if (!v) return; setSourceEnt(v); setSourceOoba001(''); setSourceOoba001List([]); setCompareResult(null); setValidateErrors([]); setSyncResult(null); handleFetchOoba001List(v, 'source') }} disabled={entList.length === 0}>
-                <SelectTrigger><SelectValue placeholder="选择来源企业" /></SelectTrigger>
+              <Select value={sourceEnt} onValueChange={(v) => { if (!v) return; setSourceEnt(v); setSourceOoba001(''); setSourceOoba001List([]); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null); handleFetchOoba001List(v, 'source') }} disabled={entList.length === 0}>
+                <SelectTrigger className="w-52"><SelectValue placeholder="选择来源企业" /></SelectTrigger>
                 <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             </Field>
             <Field label="来源参照表">
-              <Select value={sourceOoba001} onValueChange={(v) => { setSourceOoba001(v); setCompareResult(null); setValidateErrors([]); setSyncResult(null) }} disabled={!sourceEnt || sourceOoba001List.length === 0}>
+              <Select value={sourceOoba001} onValueChange={(v) => { setSourceOoba001(v); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null) }} disabled={!sourceEnt || sourceOoba001List.length === 0}>
                 <SelectTrigger><SelectValue placeholder={sourceEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
                 <SelectContent><SelectGroup>{sourceOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             </Field>
+            </div>
+
+            <div className="flex gap-4">
             <Field label="目标 ENT">
-              <Select value={targetEnt} onValueChange={(v) => { if (!v) return; setTargetEnt(v); setTargetOoba001(''); setTargetOoba001List([]); setCompareResult(null); setValidateErrors([]); setSyncResult(null); handleFetchOoba001List(v, 'target') }} disabled={entList.length === 0}>
-                <SelectTrigger><SelectValue placeholder="选择目标企业" /></SelectTrigger>
+              <Select value={targetEnt} onValueChange={(v) => { if (!v) return; setTargetEnt(v); setTargetOoba001(''); setTargetOoba001List([]); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null); handleFetchOoba001List(v, 'target') }} disabled={entList.length === 0}>
+                <SelectTrigger className="w-52"><SelectValue placeholder="选择目标企业" /></SelectTrigger>
                 <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             </Field>
             <Field label="目标参照表">
-              <Select value={targetOoba001} onValueChange={(v) => { setTargetOoba001(v); setCompareResult(null); setValidateErrors([]); setSyncResult(null) }} disabled={!targetEnt || targetOoba001List.length === 0}>
+              <Select value={targetOoba001} onValueChange={(v) => { setTargetOoba001(v); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null) }} disabled={!targetEnt || targetOoba001List.length === 0}>
                 <SelectTrigger><SelectValue placeholder={targetEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
                 <SelectContent><SelectGroup>{targetOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
               </Select>
             </Field>
+            </div>
           </div>
 
           {syncError && (
@@ -1119,7 +1128,7 @@ function GenAooi200Page() {
                 {validateLoading ? <Loader2 className="size-3.5 animate-spin" /> : <AlertTriangle className="size-3.5" />}
                 {validateLoading ? '校验中...' : '执行校验'}
               </Button>
-              <Button variant="default" size="sm" onClick={handleSync} disabled={syncLoading || checkedList.length === 0} className="gap-1.5">
+              <Button variant="outline" size="sm" onClick={handleSync} disabled={syncLoading || checkedList.length === 0 || !validationPassed} className="gap-1.5">
                 {syncLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
                 {syncLoading ? '同步中...' : '同步数据'}
               </Button>
