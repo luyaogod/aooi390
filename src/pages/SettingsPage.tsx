@@ -79,6 +79,7 @@ function SettingsPage() {
   // 外部数据库
   const [connections, setConnections] = useState<ExternalDBConnection[]>([])
   const [selectedConnectionName, setSelectedConnectionName] = useState<string>('')
+  const [switchingDB, setSwitchingDB] = useState(false)
   const [externalLoading, setExternalLoading] = useState(false)
   const [externalResult, setExternalResult] = useState<ExternalDBTestResult | null>(null)
   const [connectionsLoading, setConnectionsLoading] = useState(true)
@@ -368,11 +369,19 @@ function SettingsPage() {
               <Field label="选择连接">
                 <Select
                   value={selectedConnectionName}
-                  onValueChange={(value) => {
-                    if (value) {
-                      setSelectedConnectionName(value)
-                      setExternalResult(null)
+                  onValueChange={async (value) => {
+                    if (!value || value === selectedConnectionName) return
+                    setSwitchingDB(true)
+                    setSelectedConnectionName(value)
+                    setExternalResult(null)
+                    const result = await window.electronAPI.setDefaultExternalDBConnection(value)
+                    if (result.success) {
+                      setConnections(prev => prev.map(c => ({ ...c, isDefault: c.name === value })))
+                      toast.success(`已切换为全局数据库：${value}`)
+                    } else {
+                      toast.error(result.error ?? '切换失败')
                     }
+                    setSwitchingDB(false)
                   }}
                 >
                   <SelectTrigger className="w-60">
@@ -427,7 +436,7 @@ function SettingsPage() {
             variant="outline"
             size="sm"
             onClick={testExternalConnection}
-            disabled={externalLoading || connections.length === 0}
+            disabled={externalLoading || switchingDB || connections.length === 0}
             className="gap-1.5"
           >
             <Plug className="size-3.5" />

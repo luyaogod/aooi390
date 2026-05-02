@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 外部数据库 API
   getExternalDBConnections: () => ipcRenderer.invoke('db:get-external-connections'),
   testExternalDBConnection: (connectionName: string) => ipcRenderer.invoke('db:test-external-connection', connectionName),
+  setDefaultExternalDBConnection: (connectionName: string) => ipcRenderer.invoke('db:set-default-connection', connectionName),
   refreshExternalDBConnections: () => ipcRenderer.invoke('db:refresh-connections'),
   editExternalDBConfig: () => ipcRenderer.invoke('db:edit-config'),
 

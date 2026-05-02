@@ -179,6 +179,23 @@ ipcMain.handle('db:test-external-connection', async (_event, connectionName: str
   }
 })
 
+// IPC: 设置默认外部数据库连接（全局生效）
+ipcMain.handle('db:set-default-connection', async (_event, connectionName: string) => {
+  try {
+    await dbConnectionManager.initialize()
+    const result = await dbConnectionManager.setDefaultConnection(connectionName)
+    if (!result) {
+      return { success: false, error: `未找到连接: ${connectionName}` }
+    }
+    // 同时切换到该连接
+    await switchExternalConnection(connectionName)
+    return { success: true }
+  } catch (error) {
+    logger.error(error, '[Main] 设置默认外部数据库连接失败')
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
 // IPC: 获取Azzi001同步表配置
 ipcMain.handle('azzi001:get-sync-tables', async () => {
   try {

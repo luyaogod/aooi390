@@ -87,6 +87,7 @@ interface ElectronAPI {
   getSQLiteStatus: () => Promise<SQLiteStatus>
   getExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
   testExternalDBConnection: (connectionName: string) => Promise<ExternalDBTestResult>
+  setDefaultExternalDBConnection: (connectionName: string) => Promise<{ success: boolean; error?: string }>
   refreshExternalDBConnections: () => Promise<ExternalDBConnectionsResult>
   editExternalDBConfig: () => Promise<{ success: boolean; error?: string }>
   getAzzi001SyncTables: () => Promise<{ success: boolean; tables: Azzi001SyncTableConfig[]; error?: string }>
