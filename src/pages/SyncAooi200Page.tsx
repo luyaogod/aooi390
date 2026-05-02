@@ -26,7 +26,6 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
 import { Alert, AlertTitle, AlertDescription, AlertAction } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
 import {
@@ -119,24 +118,6 @@ function SyncAooi200Page() {
       })
       .finally(() => setEntListLoading(false))
   }, [currentConnectionName])
-
-  // 手动刷新企业列表
-  const handleLoadEntList = async () => {
-    setEntListLoading(true)
-    try {
-      const result = await window.electronAPI.aooi200QueryEnt()
-      if (result.success) {
-        setEntList(result.rows)
-        if (result.rows.length === 0) toast.warning('未查询到企业数据，请确认外部数据库已连接')
-      } else {
-        toast.error(result.error ?? '查询企业列表失败')
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : String(err))
-    } finally {
-      setEntListLoading(false)
-    }
-  }
 
   // ==================== 参照表列表 ====================
 
@@ -367,16 +348,6 @@ function SyncAooi200Page() {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {entList.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs font-normal">{entList.length} 个企业</Badge>
-                  <Button variant="ghost" size="sm" onClick={handleLoadEntList} disabled={entListLoading} className="gap-1.5 h-7 text-xs">
-                    <Loader2 className={entListLoading ? 'size-3 animate-spin' : 'size-3 hidden'} />
-                    刷新
-                  </Button>
-                </div>
-              )}
-
               <div className="flex gap-4">
                 <Field label="来源 ENT">
                   <Select value={sourceEnt} onValueChange={(v) => { if (!v) return; setSourceEnt(v); setSourceOoba001(''); setSourceOoba001List([]); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null); handleFetchOoba001List(v, 'source') }} disabled={entList.length === 0}>

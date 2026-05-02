@@ -218,20 +218,6 @@ function GenAooi200Page() {
     finally { setExportResultLoading(false) }
   }
 
-  // IC行业单据别批次设置MULTI
-  const handleLoadEntList = async () => {
-    setEntListLoading(true); setWfError(null)
-    try {
-      const result = await window.electronAPI.aooi200QueryEnt()
-      if (result.success) {
-        setEntList(result.rows)
-        if (result.rows.length === 0) toast.warning('未查询到企业数据，请确认外部数据库已连接')
-      } else { setWfError(result.error ?? '查询企业列表失败'); toast.error(result.error ?? '查询企业列表失败') }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err); setWfError(msg); toast.error(msg)
-    } finally { setEntListLoading(false) }
-  }
-
   const selectedSchema = entList.find(e => e.gzou001 === selectedEnt)?.gzou003 ?? ''
 
   const handleWfPreview = async () => {
@@ -359,17 +345,14 @@ function GenAooi200Page() {
         <CardHeader><CardTitle>IC行业单据别批次设置MULTI</CardTitle><CardDescription>查询aooi199中对应作业编号属于IC行业("_wf")的所有单据别明细, 可批量将其作业编号更新为MULTI, 并同时绑定标准作业编号和IC行业作业编号</CardDescription></CardHeader>
         <CardContent className="flex flex-col gap-4">
           <Field label="选择企业">
-            <div className="flex items-center gap-2">
-              {entListLoading ? (
-                <Skeleton className="h-9 w-52" />
-              ) : (
-                <Select value={selectedEnt} onValueChange={(value) => { if (value) { setSelectedEnt(value); setWfPreviewRows([]); setWfError(null); setWfResult(null) } }} disabled={entList.length === 0}>
-                  <SelectTrigger className="w-52"><SelectValue placeholder={entList.length === 0 ? '暂无企业数据' : '选择企业'} /></SelectTrigger>
-                  <SelectContent><SelectGroup>{entList.map(ent => <SelectItem key={ent.gzou001} value={ent.gzou001}>{ent.gzou001}{ent.gzou003 ? ` (${ent.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
-                </Select>
-              )}
-              <Button variant="outline" size="sm" onClick={handleLoadEntList} disabled={entListLoading} className="gap-1.5">{entListLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}{entListLoading ? '加载中...' : '重新加载'}</Button>
-            </div>
+            {entListLoading ? (
+              <Skeleton className="h-9 w-52" />
+            ) : (
+              <Select value={selectedEnt} onValueChange={(value) => { if (value) { setSelectedEnt(value); setWfPreviewRows([]); setWfError(null); setWfResult(null) } }} disabled={entList.length === 0}>
+                <SelectTrigger className="w-52"><SelectValue placeholder={entList.length === 0 ? '暂无企业数据' : '选择企业'} /></SelectTrigger>
+                <SelectContent><SelectGroup>{entList.map(ent => <SelectItem key={ent.gzou001} value={ent.gzou001}>{ent.gzou001}{ent.gzou003 ? ` (${ent.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
+              </Select>
+            )}
           </Field>
           {wfError && <Alert variant="destructive"><AlertTriangle className="size-4" /><AlertTitle>操作失败</AlertTitle><AlertDescription>{wfError}</AlertDescription></Alert>}
           {wfResult != null && <Alert variant="default"><CheckCircle2 className="size-4" /><AlertTitle>更新完成</AlertTitle><AlertDescription>共插入 {wfResult} 条记录</AlertDescription></Alert>}
