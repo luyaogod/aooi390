@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 import {
   Card,
@@ -25,6 +25,8 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
 import { Alert, AlertTitle, AlertDescription, AlertAction } from '@/components/ui/alert'
 import { Field } from '@/components/ui/field'
 import {
@@ -34,11 +36,19 @@ import {
   CheckCircle2,
   AlertTriangle,
   Save,
-  Database,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
+interface ExternalDBConnection {
+  name: string
+  type: 'kingbase' | 'oracle'
+  isDefault?: boolean
+  description?: string
+}
+
 function SyncAooi200Page() {
+  const [connections, setConnections] = useState<ExternalDBConnection[]>([])
+
   // ENT 列表
   const [entList, setEntList] = useState<{ gzou001: string; gzou003: string }[]>([])
   const [entListLoading, setEntListLoading] = useState(false)
@@ -67,12 +77,50 @@ function SyncAooi200Page() {
   const [restoreLoading, setRestoreLoading] = useState(false)
   const [backupCleanLoading, setBackupCleanLoading] = useState(false)
 
+  const currentConnectionName = useMemo(() => {
+    const def = connections.find(c => c.isDefault)
+    return def?.name ?? connections[0]?.name ?? ''
+  }, [connections])
+
   const sourceSchema = entList.find(e => e.gzou001 === sourceEnt)?.gzou003 ?? ''
   const targetSchema = entList.find(e => e.gzou001 === targetEnt)?.gzou003 ?? ''
   const backupEntSchema = entList.find(e => e.gzou001 === backupSchema)?.gzou003 ?? ''
 
-  // ==================== ENT 列表 ====================
+  const fetchConnections = async () => {
+    try {
+      const result = await window.electronAPI.getExternalDBConnections()
+      if (result.success) {
+        setConnections(result.connections)
+      }
+    } catch (err) {
+      console.error('获取外部连接列表失败:', err)
+    }
+  }
 
+  useEffect(() => {
+    fetchConnections()
+  }, [])
+
+  // 自动加载企业列表
+  useEffect(() => {
+    if (!currentConnectionName) return
+    setEntListLoading(true)
+    window.electronAPI.aooi200QueryEnt()
+      .then(result => {
+        if (result.success) {
+          setEntList(result.rows)
+          if (result.rows.length === 0) toast.warning('未查询到企业数据，请确认外部数据库已连接')
+        } else {
+          toast.error(result.error ?? '查询企业列表失败')
+        }
+      })
+      .catch(err => {
+        toast.error(err instanceof Error ? err.message : String(err))
+      })
+      .finally(() => setEntListLoading(false))
+  }, [currentConnectionName])
+
+  // 手动刷新企业列表
   const handleLoadEntList = async () => {
     setEntListLoading(true)
     try {
@@ -294,45 +342,72 @@ function SyncAooi200Page() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleLoadEntList} disabled={entListLoading} className="gap-1.5">
-              {entListLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}
-              {entListLoading ? '加载中...' : '加载企业'}
-            </Button>
-            {entList.length > 0 && <span className="text-sm text-muted-foreground">已加载 {entList.length} 个企业</span>}
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <div className="flex gap-4">
-              <Field label="来源 ENT">
-                <Select value={sourceEnt} onValueChange={(v) => { if (!v) return; setSourceEnt(v); setSourceOoba001(''); setSourceOoba001List([]); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null); handleFetchOoba001List(v, 'source') }} disabled={entList.length === 0}>
-                  <SelectTrigger className="w-44"><SelectValue placeholder="选择来源企业" /></SelectTrigger>
-                  <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
-                </Select>
-              </Field>
-              <Field label="来源参照表">
-                <Select value={sourceOoba001} onValueChange={(v) => { setSourceOoba001(v); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null) }} disabled={!sourceEnt || sourceOoba001List.length === 0}>
-                  <SelectTrigger className="w-44"><SelectValue placeholder={sourceEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
-                  <SelectContent><SelectGroup>{sourceOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
-                </Select>
-              </Field>
+          {entListLoading ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-9 w-44" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-9 w-44" />
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-9 w-44" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-9 w-44" />
+                </div>
+              </div>
             </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {entList.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs font-normal">{entList.length} 个企业</Badge>
+                  <Button variant="ghost" size="sm" onClick={handleLoadEntList} disabled={entListLoading} className="gap-1.5 h-7 text-xs">
+                    <Loader2 className={entListLoading ? 'size-3 animate-spin' : 'size-3 hidden'} />
+                    刷新
+                  </Button>
+                </div>
+              )}
 
-            <div className="flex gap-4">
-              <Field label="目标 ENT">
-                <Select value={targetEnt} onValueChange={(v) => { if (!v) return; setTargetEnt(v); setTargetOoba001(''); setTargetOoba001List([]); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null); handleFetchOoba001List(v, 'target') }} disabled={entList.length === 0}>
-                  <SelectTrigger className="w-44"><SelectValue placeholder="选择目标企业" /></SelectTrigger>
-                  <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
-                </Select>
-              </Field>
-              <Field label="目标参照表">
-                <Select value={targetOoba001} onValueChange={(v) => { setTargetOoba001(v); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null) }} disabled={!targetEnt || targetOoba001List.length === 0}>
-                  <SelectTrigger className="w-44"><SelectValue placeholder={targetEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
-                  <SelectContent><SelectGroup>{targetOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
-                </Select>
-              </Field>
+              <div className="flex gap-4">
+                <Field label="来源 ENT">
+                  <Select value={sourceEnt} onValueChange={(v) => { if (!v) return; setSourceEnt(v); setSourceOoba001(''); setSourceOoba001List([]); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null); handleFetchOoba001List(v, 'source') }} disabled={entList.length === 0}>
+                    <SelectTrigger className="w-44"><SelectValue placeholder="选择来源企业" /></SelectTrigger>
+                    <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+                <Field label="来源参照表">
+                  <Select value={sourceOoba001} onValueChange={(v) => { if (!v) return; setSourceOoba001(v); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null) }} disabled={!sourceEnt || sourceOoba001List.length === 0}>
+                    <SelectTrigger className="w-44"><SelectValue placeholder={sourceEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
+                    <SelectContent><SelectGroup>{sourceOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+              </div>
+
+              <div className="flex gap-4">
+                <Field label="目标 ENT">
+                  <Select value={targetEnt} onValueChange={(v) => { if (!v) return; setTargetEnt(v); setTargetOoba001(''); setTargetOoba001List([]); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null); handleFetchOoba001List(v, 'target') }} disabled={entList.length === 0}>
+                    <SelectTrigger className="w-44"><SelectValue placeholder="选择目标企业" /></SelectTrigger>
+                    <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+                <Field label="目标参照表">
+                  <Select value={targetOoba001} onValueChange={(v) => { if (!v) return; setTargetOoba001(v); setCompareResult(null); setValidateErrors([]); setValidationPassed(false); setSyncResult(null) }} disabled={!targetEnt || targetOoba001List.length === 0}>
+                    <SelectTrigger className="w-44"><SelectValue placeholder={targetEnt ? '选择参照表' : '请先选企业'} /></SelectTrigger>
+                    <SelectContent><SelectGroup>{targetOoba001List.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}</SelectGroup></SelectContent>
+                  </Select>
+                </Field>
+              </div>
             </div>
-          </div>
+          )}
 
           {syncError && (
             <Alert variant="destructive">
@@ -483,10 +558,14 @@ function SyncAooi200Page() {
         <CardContent className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <Field label="目标 Schema 的 ENT">
-              <Select value={backupSchema} onValueChange={(v) => { if (!v) return; setBackupSchema(v); setBackupVersions([]) }} disabled={entList.length === 0}>
-                <SelectTrigger className="w-52"><SelectValue placeholder="选择企业" /></SelectTrigger>
-                <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
-              </Select>
+              {entListLoading ? (
+                <Skeleton className="h-9 w-52" />
+              ) : (
+                <Select value={backupSchema} onValueChange={(v) => { if (!v) return; setBackupSchema(v); setBackupVersions([]) }} disabled={entList.length === 0}>
+                  <SelectTrigger className="w-52"><SelectValue placeholder="选择企业" /></SelectTrigger>
+                  <SelectContent><SelectGroup>{entList.map(e => <SelectItem key={e.gzou001} value={e.gzou001}>{e.gzou001}{e.gzou003 ? ` (${e.gzou003})` : ''}</SelectItem>)}</SelectGroup></SelectContent>
+                </Select>
+              )}
             </Field>
             <Button variant="outline" size="sm" onClick={handleListBackups} disabled={backupListLoading || !backupSchema} className="gap-1.5 mt-5">
               {backupListLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
