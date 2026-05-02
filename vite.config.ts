@@ -25,7 +25,7 @@ export default defineConfig({
           build: {
             sourcemap: true,
             rollupOptions: {
-              external: ['pg', 'oracledb'],
+              external: ['better-sqlite3', 'pg', 'oracledb'],
             },
           },
         },
