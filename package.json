@@ -12,8 +12,6 @@
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "@fontsource-variable/geist": "^5.2.8",
-    "@prisma/adapter-better-sqlite3": "^7.7.0",
-    "@prisma/client": "^6.19.0",
     "@types/oracledb": "^6.10.2",
     "@types/pg": "^8.20.0",
     "better-sqlite3": "^12.9.0",
@@ -53,6 +51,7 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "postcss": "^8.5.10",
+    "@prisma/client": "^6.19.0",
     "prisma": "^6.19.0",
     "tailwindcss": "^4.2.4",
     "tailwindcss-animate": "^1.0.7",

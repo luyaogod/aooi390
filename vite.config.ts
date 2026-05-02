@@ -25,7 +25,7 @@ export default defineConfig({
           build: {
             sourcemap: true,
             rollupOptions: {
-              external: ['@prisma/client', 'pg', 'oracledb'],
+              external: ['pg', 'oracledb'],
             },
           },
         },

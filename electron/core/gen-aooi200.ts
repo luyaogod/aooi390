@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import { externalDB, appDB } from '../db/clients';
 import logger from '../utils/logger';
 import { dbConnectionManager } from '../config/db-connections';
-import { Oobx } from '@prisma/client';
+import type { Oobx } from '@prisma/client';
 
 /** 校验错误信息 */
 export interface ValidateError {
@@ -52,42 +52,158 @@ interface FieldMeta {
     isRequired: boolean;
 }
 
-/** 从 Prisma runtime 获取模型的字段类型映射 */
+// 字段类型元数据 —— 从 Prisma schema 手动同步，仅覆盖 genAooi200 同步涉及的 7 张表
+const modelFieldMeta: Record<string, Record<string, FieldMeta>> = {
+    Gzzj: {
+        gzzj001:   { name: 'gzzj001',   type: 'String',   isRequired: true },
+        gzzj002:   { name: 'gzzj002',   type: 'String',   isRequired: false },
+        gzzj003:   { name: 'gzzj003',   type: 'String',   isRequired: false },
+        gzzjownid: { name: 'gzzjownid', type: 'String',   isRequired: false },
+        gzzjowndp: { name: 'gzzjowndp', type: 'String',   isRequired: false },
+        gzzjcrtid: { name: 'gzzjcrtid', type: 'String',   isRequired: false },
+        gzzjcrtdp: { name: 'gzzjcrtdp', type: 'String',   isRequired: false },
+        gzzjcrtdt: { name: 'gzzjcrtdt', type: 'DateTime', isRequired: false },
+        gzzjmodid: { name: 'gzzjmodid', type: 'String',   isRequired: false },
+        gzzjmoddt: { name: 'gzzjmoddt', type: 'DateTime', isRequired: false },
+        gzzjstus:  { name: 'gzzjstus',  type: 'String',   isRequired: false },
+    },
+    Gzzol: {
+        gzzol001: { name: 'gzzol001', type: 'String', isRequired: true },
+        gzzol002: { name: 'gzzol002', type: 'String', isRequired: true },
+        gzzol003: { name: 'gzzol003', type: 'String', isRequired: false },
+        gzzol004: { name: 'gzzol004', type: 'String', isRequired: false },
+    },
+    Gzcb: {
+        gzcb001:   { name: 'gzcb001',   type: 'Int',      isRequired: true },
+        gzcb002:   { name: 'gzcb002',   type: 'String',   isRequired: true },
+        gzcb003:   { name: 'gzcb003',   type: 'String',   isRequired: false },
+        gzcb004:   { name: 'gzcb004',   type: 'String',   isRequired: false },
+        gzcb005:   { name: 'gzcb005',   type: 'String',   isRequired: false },
+        gzcb006:   { name: 'gzcb006',   type: 'String',   isRequired: false },
+        gzcb007:   { name: 'gzcb007',   type: 'String',   isRequired: false },
+        gzcb008:   { name: 'gzcb008',   type: 'String',   isRequired: false },
+        gzcb009:   { name: 'gzcb009',   type: 'String',   isRequired: false },
+        gzcb010:   { name: 'gzcb010',   type: 'String',   isRequired: false },
+        gzcb011:   { name: 'gzcb011',   type: 'String',   isRequired: false },
+        gzcb012:   { name: 'gzcb012',   type: 'String',   isRequired: false },
+        gzcb013:   { name: 'gzcb013',   type: 'String',   isRequired: false },
+        gzcb014:   { name: 'gzcb014',   type: 'String',   isRequired: false },
+        gzcb015:   { name: 'gzcb015',   type: 'String',   isRequired: false },
+        gzcbud001: { name: 'gzcbud001', type: 'String',   isRequired: false },
+        gzcbud002: { name: 'gzcbud002', type: 'String',   isRequired: false },
+        gzcbud003: { name: 'gzcbud003', type: 'String',   isRequired: false },
+        gzcbud004: { name: 'gzcbud004', type: 'String',   isRequired: false },
+        gzcbud005: { name: 'gzcbud005', type: 'String',   isRequired: false },
+        gzcbud006: { name: 'gzcbud006', type: 'String',   isRequired: false },
+        gzcbud007: { name: 'gzcbud007', type: 'String',   isRequired: false },
+        gzcbud008: { name: 'gzcbud008', type: 'String',   isRequired: false },
+        gzcbud009: { name: 'gzcbud009', type: 'String',   isRequired: false },
+        gzcbud010: { name: 'gzcbud010', type: 'String',   isRequired: false },
+        gzcbud011: { name: 'gzcbud011', type: 'Float',    isRequired: false },
+        gzcbud012: { name: 'gzcbud012', type: 'Float',    isRequired: false },
+        gzcbud013: { name: 'gzcbud013', type: 'Float',    isRequired: false },
+        gzcbud014: { name: 'gzcbud014', type: 'Float',    isRequired: false },
+        gzcbud015: { name: 'gzcbud015', type: 'Float',    isRequired: false },
+        gzcbud016: { name: 'gzcbud016', type: 'Float',    isRequired: false },
+        gzcbud017: { name: 'gzcbud017', type: 'Float',    isRequired: false },
+        gzcbud018: { name: 'gzcbud018', type: 'Float',    isRequired: false },
+        gzcbud019: { name: 'gzcbud019', type: 'Float',    isRequired: false },
+        gzcbud020: { name: 'gzcbud020', type: 'Float',    isRequired: false },
+        gzcbud021: { name: 'gzcbud021', type: 'DateTime', isRequired: false },
+        gzcbud022: { name: 'gzcbud022', type: 'DateTime', isRequired: false },
+        gzcbud023: { name: 'gzcbud023', type: 'DateTime', isRequired: false },
+        gzcbud024: { name: 'gzcbud024', type: 'DateTime', isRequired: false },
+        gzcbud025: { name: 'gzcbud025', type: 'DateTime', isRequired: false },
+        gzcbud026: { name: 'gzcbud026', type: 'DateTime', isRequired: false },
+        gzcbud027: { name: 'gzcbud027', type: 'DateTime', isRequired: false },
+        gzcbud028: { name: 'gzcbud028', type: 'DateTime', isRequired: false },
+        gzcbud029: { name: 'gzcbud029', type: 'DateTime', isRequired: false },
+        gzcbud030: { name: 'gzcbud030', type: 'DateTime', isRequired: false },
+    },
+    Gzcbl: {
+        gzcbl001: { name: 'gzcbl001', type: 'Int',    isRequired: true },
+        gzcbl002: { name: 'gzcbl002', type: 'String', isRequired: true },
+        gzcbl003: { name: 'gzcbl003', type: 'String', isRequired: true },
+        gzcbl004: { name: 'gzcbl004', type: 'String', isRequired: false },
+        gzcbl005: { name: 'gzcbl005', type: 'String', isRequired: false },
+        gzcbl006: { name: 'gzcbl006', type: 'String', isRequired: false },
+        gzcbl007: { name: 'gzcbl007', type: 'String', isRequired: false },
+    },
+    Gzzal: {
+        gzzal001: { name: 'gzzal001', type: 'String', isRequired: true },
+        gzzal002: { name: 'gzzal002', type: 'String', isRequired: true },
+        gzzal003: { name: 'gzzal003', type: 'String', isRequired: false },
+        gzzal004: { name: 'gzzal004', type: 'String', isRequired: false },
+        gzzal005: { name: 'gzzal005', type: 'String', isRequired: false },
+        gzzal006: { name: 'gzzal006', type: 'String', isRequired: false },
+    },
+    Gzzz: {
+        gzzzstus:  { name: 'gzzzstus',  type: 'String',   isRequired: false },
+        gzzz001:   { name: 'gzzz001',   type: 'String',   isRequired: true },
+        gzzz002:   { name: 'gzzz002',   type: 'String',   isRequired: false },
+        gzzz003:   { name: 'gzzz003',   type: 'Int',      isRequired: false },
+        gzzz004:   { name: 'gzzz004',   type: 'String',   isRequired: false },
+        gzzzownid: { name: 'gzzzownid', type: 'String',   isRequired: false },
+        gzzzowndp: { name: 'gzzzowndp', type: 'String',   isRequired: false },
+        gzzzcrtid: { name: 'gzzzcrtid', type: 'String',   isRequired: false },
+        gzzzcrtdp: { name: 'gzzzcrtdp', type: 'String',   isRequired: false },
+        gzzzcrtdt: { name: 'gzzzcrtdt', type: 'DateTime', isRequired: false },
+        gzzzmodid: { name: 'gzzzmodid', type: 'String',   isRequired: false },
+        gzzzmoddt: { name: 'gzzzmoddt', type: 'DateTime', isRequired: false },
+        gzzz005:   { name: 'gzzz005',   type: 'String',   isRequired: false },
+        gzzz006:   { name: 'gzzz006',   type: 'String',   isRequired: false },
+        gzzz007:   { name: 'gzzz007',   type: 'String',   isRequired: false },
+        gzzz008:   { name: 'gzzz008',   type: 'String',   isRequired: false },
+        gzzz009:   { name: 'gzzz009',   type: 'String',   isRequired: false },
+        gzzz010:   { name: 'gzzz010',   type: 'String',   isRequired: false },
+        gzzz011:   { name: 'gzzz011',   type: 'String',   isRequired: false },
+    },
+    Gzza: {
+        gzzastus:  { name: 'gzzastus',  type: 'String',   isRequired: false },
+        gzza001:   { name: 'gzza001',   type: 'String',   isRequired: true },
+        gzza002:   { name: 'gzza002',   type: 'String',   isRequired: false },
+        gzza003:   { name: 'gzza003',   type: 'String',   isRequired: false },
+        gzza004:   { name: 'gzza004',   type: 'String',   isRequired: false },
+        gzza005:   { name: 'gzza005',   type: 'String',   isRequired: false },
+        gzza006:   { name: 'gzza006',   type: 'String',   isRequired: false },
+        gzza007:   { name: 'gzza007',   type: 'Int',      isRequired: false },
+        gzza008:   { name: 'gzza008',   type: 'String',   isRequired: false },
+        gzza009:   { name: 'gzza009',   type: 'String',   isRequired: false },
+        gzza010:   { name: 'gzza010',   type: 'String',   isRequired: false },
+        gzza011:   { name: 'gzza011',   type: 'String',   isRequired: false },
+        gzza012:   { name: 'gzza012',   type: 'String',   isRequired: false },
+        gzza013:   { name: 'gzza013',   type: 'String',   isRequired: false },
+        gzza014:   { name: 'gzza014',   type: 'Int',      isRequired: false },
+        gzza015:   { name: 'gzza015',   type: 'String',   isRequired: false },
+        gzza016:   { name: 'gzza016',   type: 'String',   isRequired: false },
+        gzzaownid: { name: 'gzzaownid', type: 'String',   isRequired: false },
+        gzzaowndp: { name: 'gzzaowndp', type: 'String',   isRequired: false },
+        gzzacrtid: { name: 'gzzacrtid', type: 'String',   isRequired: false },
+        gzzacrtdp: { name: 'gzzacrtdp', type: 'String',   isRequired: false },
+        gzzacrtdt: { name: 'gzzacrtdt', type: 'DateTime', isRequired: false },
+        gzzamodid: { name: 'gzzamodid', type: 'String',   isRequired: false },
+        gzzamoddt: { name: 'gzzamoddt', type: 'DateTime', isRequired: false },
+        gzza017:   { name: 'gzza017',   type: 'String',   isRequired: false },
+        gzza018:   { name: 'gzza018',   type: 'String',   isRequired: false },
+        gzza019:   { name: 'gzza019',   type: 'String',   isRequired: false },
+        gzza020:   { name: 'gzza020',   type: 'String',   isRequired: false },
+        gzza021:   { name: 'gzza021',   type: 'String',   isRequired: false },
+        gzza022:   { name: 'gzza022',   type: 'String',   isRequired: false },
+        gzza023:   { name: 'gzza023',   type: 'String',   isRequired: false },
+        gzza024:   { name: 'gzza024',   type: 'Int',      isRequired: false },
+    },
+};
+
+/** 从静态元数据获取模型的字段类型映射 */
 function getModelFieldMap(modelName: string): Record<string, FieldMeta> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const prisma = appDB.getPrisma() as any;
-
-    // Prisma v6: _runtimeDataModel.models[modelName].fields
-    let modelFields: any[] | undefined;
-    const runtime = prisma._runtimeDataModel;
-    if (runtime?.models?.[modelName]?.fields) {
-        modelFields = runtime.models[modelName].fields;
-    }
-    // 兜底：尝试 _dmmf
-    if (!modelFields && prisma._dmmf?.datamodel?.models) {
-        const dmmfModel = prisma._dmmf.datamodel.models.find((m: any) => m.name === modelName);
-        if (dmmfModel) modelFields = dmmfModel.fields;
-    }
-
-    if (!modelFields) {
-        logger.error({ runtimeKeys: runtime ? Object.keys(runtime.models || {}) : 'undefined' },
-            '[genAooi200] 无法获取模型字段: %s', modelName);
+    const meta = modelFieldMeta[modelName];
+    if (!meta) {
+        logger.error('[genAooi200] 无法获取模型字段元数据: %s', modelName);
         return {};
     }
-
-    const map: Record<string, FieldMeta> = {};
-    for (const field of modelFields) {
-        if (field.kind === 'scalar') {
-            map[field.name] = {
-                name: field.name,
-                type: field.type as ScalarType,
-                isRequired: field.isRequired,
-            };
-        }
-    }
-    logger.debug({ modelName, fieldNames: Object.keys(map) },
-        '[genAooi200] %s 字段映射: %d 个字段', modelName, Object.keys(map).length);
-    return map;
+    logger.debug({ modelName, fieldCount: Object.keys(meta).length },
+        '[genAooi200] %s 字段映射: %d 个字段', modelName, Object.keys(meta).length);
+    return meta;
 }
 
 /** 将外部 DB 的行数据转换为 Prisma 期望的类型 */
@@ -138,16 +254,9 @@ function convertRow(row: Record<string, unknown>, fieldMap: Record<string, Field
     return converted;
 }
 
-/** modelName → Prisma client 属性名（首字母小写） */
-function toClientName(modelName: string): string {
-    return modelName.charAt(0).toLowerCase() + modelName.slice(1);
-}
-
 /** 同步单张表 */
 async function syncTable(table: string, sql: string): Promise<number> {
-    const prisma = appDB.getPrisma();
     const modelName = tableModelMap[table];        // schema 名，如 Gzzj
-    const clientName = toClientName(modelName);     // client 名，如 gzzj
 
     // 构建字段类型映射
     const fieldMap = getModelFieldMap(modelName);
@@ -170,13 +279,21 @@ async function syncTable(table: string, sql: string): Promise<number> {
     // 类型转换
     const rows = rawRows.map(row => convertRow(row, fieldMap));
 
-    // 写入 SQLite：清旧数据 + 插入新数据
-    await prisma.$transaction(async (tx) => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const txn = tx as any;
-        await txn[clientName].deleteMany();
-        await txn[clientName].createMany({ data: rows });
+    // 写入 SQLite：清旧数据 + 插入新数据（事务）
+    const db = appDB.getDb();
+    const writeAll = db.transaction((dataRows: Record<string, unknown>[]) => {
+        db.prepare(`DELETE FROM ${table}`).run();
+        if (dataRows.length > 0) {
+            const cols = Object.keys(dataRows[0]);
+            const insert = db.prepare(
+                `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+            );
+            for (const row of dataRows) {
+                insert.run(...cols.map(c => row[c]));
+            }
+        }
     });
+    writeAll(rows);
 
     logger.info({ table, rowCount: rows.length }, '[genAooi200] %s 同步完成', table);
     return rows.length;
@@ -186,15 +303,12 @@ async function syncTable(table: string, sql: string): Promise<number> {
  * 清空 SQLite 中所有 gen-aooi200 相关表数据
  */
 export async function cleanSqliteTables(): Promise<void> {
-    const prisma = appDB.getPrisma();
+    const db = appDB.getDb();
     logger.info('[genAooi200] 开始清空 SQLite 相关表');
 
     for (const table of allTables) {
-        const modelName = tableModelMap[table];
-        const clientName = toClientName(modelName);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await (prisma as any)[clientName].deleteMany();
-        logger.info({ table, count: result.count }, '[genAooi200] 清空 %s', table);
+        const result = db.prepare(`DELETE FROM ${table}`).run();
+        logger.info({ table, count: result.changes }, '[genAooi200] 清空 %s', table);
     }
 
     logger.info('[genAooi200] SQLite 相关表清空完成');
@@ -331,13 +445,12 @@ export class Aooi200QueryService {
     }
 
     /** 执行 SQL 查询：根据模式路由到外部 DB 或内部 SQLite */
-    private async query(sql: string): Promise<Record<string, unknown>[]> {
+    private async query(sql: string, ...params: unknown[]): Promise<Record<string, unknown>[]> {
         if (this.mode === 'external') {
             const result = await externalDB.query(sql);
             return result.rows as Record<string, unknown>[];
         } else {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            return (appDB.getPrisma() as any).$queryRawUnsafe(sql) as Promise<Record<string, unknown>[]>;
+            return appDB.getDb().prepare(sql).all(...params) as Record<string, unknown>[];
         }
     }
 
@@ -357,11 +470,11 @@ export class Aooi200QueryService {
               AND gzzz002 = gzza001
               AND gzza002 IN ('T','Q')
               AND gzzzstus = 'Y'
-              AND gzzz001 = '${gzzz001}'
+              AND gzzz001 = ?
             ORDER BY gzzz001, gzzal003
         `;
-        logger.debug({ sql }, '[Aooi200Query] gzzz006Get: 查询 SQL');
-        const rows = await this.query(sql);
+        logger.debug({ sql, params: [gzzz001] }, '[Aooi200Query] gzzz006Get: 查询 SQL');
+        const rows = await this.query(sql, gzzz001);
         return rows.length > 0 ? String(rows[0]['gzzz006'] ?? '') : '';
     }
 
@@ -375,10 +488,10 @@ export class Aooi200QueryService {
         const sql = `
             SELECT gzzz005, gzzz006
             FROM gzzz_t
-            WHERE gzzz001 = '${gzzz001}'
+            WHERE gzzz001 = ?
         `;
-        logger.debug({ sql }, '[Aooi200Query] gzzzInfoGet: 查询 SQL');
-        const rows = await this.query(sql);
+        logger.debug({ sql, params: [gzzz001] }, '[Aooi200Query] gzzzInfoGet: 查询 SQL');
+        const rows = await this.query(sql, gzzz001);
         if (rows.length === 0) return null;
         return {
             gzzz005: String(rows[0]['gzzz005'] ?? ''),
@@ -401,10 +514,10 @@ export class Aooi200QueryService {
             WHERE 1=1
               AND gzzz002 = gzza001
               AND gzza002 IN ('T','Q')
-              AND gzzz001 = '${gzzz001}'
+              AND gzzz001 = ?
         `;
-        logger.debug({ sql }, '[Aooi200Query] gzzz001Chk: 查询 SQL');
-        const rows = await this.query(sql);
+        logger.debug({ sql, params: [gzzz001] }, '[Aooi200Query] gzzz001Chk: 查询 SQL');
+        const rows = await this.query(sql, gzzz001);
         const count = Number(rows[0]?.cnt ?? 0);
         logger.debug({ count }, '[Aooi200Query] gzzz001Chk: 查询结果');
         return count > 0;
@@ -733,16 +846,13 @@ interface ConfigExportData {
  * @param filePath 输出 JSON 文件路径
  */
 export async function exportConfig(filePath: string): Promise<{ table: string; count: number }[]> {
-    const prisma = appDB.getPrisma();
+    const db = appDB.getDb();
     const results: { table: string; count: number }[] = [];
     const tablesData: Record<string, Record<string, unknown>[]> = {};
 
     for (const table of allTables) {
-        const modelName = tableModelMap[table];
-        const clientName = toClientName(modelName);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = await (prisma as any)[clientName].findMany();
-        tablesData[table] = rows as Record<string, unknown>[];
+        const rows = db.prepare(`SELECT * FROM ${table}`).all() as Record<string, unknown>[];
+        tablesData[table] = rows;
         results.push({ table, count: rows.length });
         logger.info('[genAooi200] 导出 %s: %d 条', table, rows.length);
     }
@@ -773,12 +883,11 @@ export async function importConfig(filePath: string): Promise<{ table: string; c
         throw new Error('无效的配置文件格式：缺少 version 或 tables 字段');
     }
 
-    const prisma = appDB.getPrisma();
+    const db = appDB.getDb();
     const results: { table: string; count: number }[] = [];
 
     for (const table of allTables) {
         const modelName = tableModelMap[table];
-        const clientName = toClientName(modelName);
         const rows = data.tables[table];
 
         if (!rows || !Array.isArray(rows)) {
@@ -792,12 +901,20 @@ export async function importConfig(filePath: string): Promise<{ table: string; c
 
         const convertedRows = rows.map(row => convertRow(row, fieldMap));
 
-        await prisma.$transaction(async (tx) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const txn = tx as any;
-            await txn[clientName].deleteMany();
-            await txn[clientName].createMany({ data: convertedRows });
+        // 事务：清旧数据 + 插入新数据
+        const writeAll = db.transaction((dataRows: Record<string, unknown>[]) => {
+            db.prepare(`DELETE FROM ${table}`).run();
+            if (dataRows.length > 0) {
+                const cols = Object.keys(dataRows[0]);
+                const insert = db.prepare(
+                    `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})`,
+                );
+                for (const row of dataRows) {
+                    insert.run(...cols.map(c => row[c]));
+                }
+            }
         });
+        writeAll(convertedRows);
 
         logger.info('[genAooi200] 导入 %s: %d 条', table, convertedRows.length);
         results.push({ table, count: convertedRows.length });

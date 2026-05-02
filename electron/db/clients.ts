@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import Database from 'better-sqlite3';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import * as oracledb from 'oracledb';
 import { getSqliteDBPath } from '../utils/paths';
@@ -43,7 +43,7 @@ export interface OracleConfig {
 /**
  * 外部数据库配置联合类型
  */
-export type ExternalDBConfig = 
+export type ExternalDBConfig =
   | { type: 'kingbase'; config: KingbaseConfig }
   | { type: 'oracle'; config: OracleConfig };
 
@@ -51,29 +51,13 @@ export type ExternalDBConfig =
 
 /**
  * 应用主数据库管理类（SQLite）
- * 单例模式，用于管理固定的本地 app.db 数据库连接
+ * 单例模式，基于 better-sqlite3 直接操作本地 app.db
  */
 export class AppDBManager {
   private static instance: AppDBManager;
-  private prisma: PrismaClient;
-  private _isConnected: boolean = false;
+  private db: Database.Database | null = null;
 
-  private constructor() {
-    const dbPath = getSqliteDBPath().replace(/\\/g, '/')
-    // Prisma SQLite Windows 路径格式：使用 file: 前缀 + 正斜杠绝对路径
-    const dbUrl = `file:${dbPath}`
-
-    this.prisma = new PrismaClient({
-      datasources: {
-        db: {
-          url: dbUrl,
-        },
-      },
-      log: process.env.NODE_ENV === 'development'
-        ? ['query', 'info', 'warn', 'error']
-        : ['error'],
-    });
-  }
+  private constructor() {}
 
   /**
    * 获取单例实例
@@ -86,29 +70,36 @@ export class AppDBManager {
   }
 
   /**
-   * 获取 Prisma Client 实例
+   * 获取 SQLite Database 实例
    */
-  public getPrisma(): PrismaClient {
-    return this.prisma;
+  public getDb(): Database.Database {
+    if (!this.db) {
+      throw new Error('[AppDBManager] Database not connected. Call connect() first.');
+    }
+    return this.db;
   }
 
   /**
    * 获取连接状态
    */
   public get isConnected(): boolean {
-    return this._isConnected;
+    return this.db !== null;
   }
 
   /**
    * 连接数据库
    */
   public async connect(): Promise<void> {
+    if (this.db) return;
+
     try {
-      await this.prisma.$connect();
-      this._isConnected = true;
-      logger.info('[AppDBManager] SQLite database connected successfully');
+      const dbPath = getSqliteDBPath().replace(/\\/g, '/');
+      this.db = new Database(dbPath);
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('foreign_keys = ON');
+      logger.info('[AppDBManager] SQLite database connected successfully: %s', dbPath);
     } catch (error) {
-      this._isConnected = false;
+      this.db = null;
       logger.error(error, '[AppDBManager] Database connection failed');
       throw error;
     }
@@ -118,9 +109,11 @@ export class AppDBManager {
    * 断开数据库连接
    */
   public async disconnect(): Promise<void> {
-    await this.prisma.$disconnect();
-    this._isConnected = false;
-    logger.info('[AppDBManager] Database connection closed');
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+      logger.info('[AppDBManager] Database connection closed');
+    }
   }
 
   /**
@@ -128,11 +121,11 @@ export class AppDBManager {
    */
   public async healthCheck(): Promise<boolean> {
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      this.getDb().prepare('SELECT 1').get();
       return true;
     } catch (error) {
       logger.error(error, '[AppDBManager] Health check failed');
-      throw error;
+      return false;
     }
   }
 
@@ -142,16 +135,22 @@ export class AppDBManager {
   public async testConnection(): Promise<void> {
     logger.info('========================================');
     logger.info('[AppDBManager] Starting SQLite connection test...');
-    logger.info('[AppDBManager] Connection status: %s', this._isConnected ? 'Connected' : 'Disconnected');
+    logger.info('[AppDBManager] Connection status: %s', this.db ? 'Connected' : 'Disconnected');
+
+    if (!this.db) {
+      logger.info('[AppDBManager] Not connected, skipping test');
+      logger.info('========================================');
+      return;
+    }
 
     try {
       const startTime = Date.now();
-      await this.prisma.$queryRaw`SELECT 1`;
+      this.db.prepare('SELECT 1').get();
       const duration = Date.now() - startTime;
 
       logger.info('[AppDBManager] Connection test successful');
       logger.info('[AppDBManager] Response time: %d ms', duration);
-      logger.info('[AppDBManager] Prisma Client status: Normal');
+      logger.info('[AppDBManager] Database path: %s', this.db.name);
     } catch (error) {
       logger.error('[AppDBManager] Connection test failed');
       logger.error(error, '[AppDBManager] Error');
@@ -170,16 +169,16 @@ export class AppDBManager {
  */
 export class ExternalDBManager {
   private static instance: ExternalDBManager;
-  
+
   // 当前连接状态
   private _dbType: ExternalDBType | null = null;
   private _isConnected: boolean = false;
   private _currentConfig: KingbaseConfig | OracleConfig | null = null;
-  
+
   // Kingbase 连接池
   private kingbasePool: Pool | null = null;
   private kingbaseConfig: KingbaseConfig | null = null;
-  
+
   // Oracle 连接池
   private oraclePool: oracledb.Pool | null = null;
   private oracleConfig: OracleConfig | null = null;
@@ -403,7 +402,7 @@ export class ExternalDBManager {
    * 执行 Kingbase SQL 查询
    */
   public async queryKingbase<T extends QueryResultRow>(
-    sql: string, 
+    sql: string,
     params?: unknown[]
   ): Promise<QueryResult<T>> {
     if (!this.kingbasePool) {
@@ -537,7 +536,7 @@ export class ExternalDBManager {
    * @param params 参数
    */
   public async query<T extends QueryResultRow>(
-    sql: string, 
+    sql: string,
     params?: unknown[] | oracledb.BindParameters
   ): Promise<QueryResult<T> | oracledb.Result<T>> {
     if (!this._isConnected || !this._dbType) {
@@ -562,7 +561,7 @@ export class ExternalDBManager {
     }
 
     const current = this._currentConfig;
-    
+
     if (type === 'kingbase') {
       const curr = current as KingbaseConfig;
       const next = newConfig as KingbaseConfig;
@@ -586,7 +585,6 @@ export class ExternalDBManager {
 }
 
 
-
 // ==================== 导出便捷实例 ====================
 
 // 应用主数据库管理器单例
@@ -596,4 +594,4 @@ export const appDB = AppDBManager.getInstance();
 export const externalDB = ExternalDBManager.getInstance();
 
 // 导出类型
-export type { PrismaClient, Pool, PoolClient, QueryResult, QueryResultRow, oracledb };
+export type { Pool, PoolClient, QueryResult, QueryResultRow, oracledb };
