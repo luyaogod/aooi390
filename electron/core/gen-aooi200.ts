@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import { externalDB, appDB } from '../db/clients';
 import logger from '../utils/logger';
 import { dbConnectionManager } from '../config/db-connections';
+import { validateIdentifier, safeQuery, safeTransaction } from '../utils/sql-utils';
 import type { Oobx } from '@prisma/client';
 
 /** 校验错误信息 */
@@ -448,8 +449,7 @@ export class Aooi200QueryService {
     /** 执行 SQL 查询：根据模式路由到外部 DB 或内部 SQLite */
     private async query(sql: string, ...params: unknown[]): Promise<Record<string, unknown>[]> {
         if (this.mode === 'external') {
-            const result = await externalDB.query(sql);
-            return result.rows as Record<string, unknown>[];
+            return safeQuery(sql, params);
         } else {
             return appDB.getDb().prepare(sql).all(...params) as Record<string, unknown>[];
         }
@@ -937,26 +937,6 @@ export interface WfOobxRow {
     oobx002: string | null;
 }
 
-/** 单引号转义（Oracle / Kingbase 通用） */
-function esc(v: string): string {
-    return v.replace(/'/g, "''");
-}
-
-/** 在外部数据库事务中执行操作（兼容 Kingbase / Oracle） */
-async function externalTransaction<T>(fn: (exec: (sql: string) => Promise<void>) => Promise<T>): Promise<T> {
-    const dbType = externalDB.dbType;
-    if (dbType === 'kingbase') {
-        return externalDB.transactionKingbase(async (client) => {
-            return fn(async (sql) => { await client.query(sql); });
-        });
-    }
-    if (dbType === 'oracle') {
-        return externalDB.transactionOracle(async (connection) => {
-            return fn(async (sql) => { await connection.execute(sql); });
-        });
-    }
-    throw new Error(`[genAooi200] 不支持的外部数据库类型: ${dbType}`);
-}
 
 /**
  * 从外部数据库查询符合条件的 Oobx 数据（oobx004 以 _wf 结尾）
@@ -977,21 +957,21 @@ export async function queryWfOobxData(schema: string, ent: number): Promise<WfOo
         throw new Error('[genAooi200] 外部数据库未连接，无法查询 wf Oobx 数据');
     }
 
+    const safeSchema = validateIdentifier(schema, 'schema');
     const sql = `
         SELECT oobx001, oobxl003, oobx002, oobx003, oobx004
-        FROM ${schema}.oobx_t
-        LEFT JOIN ${schema}.oobxl_t ON oobxlent = oobxent AND oobxl001 = oobx001 AND oobxl002 = 'zh_CN'
+        FROM ${safeSchema}.oobx_t
+        LEFT JOIN ${safeSchema}.oobxl_t ON oobxlent = oobxent AND oobxl001 = oobx001 AND oobxl002 = 'zh_CN'
         WHERE 1=1
           AND oobx004 <> 'MULTI'
           AND oobx004 LIKE '%_wf'
-          AND EXISTS (SELECT * FROM ${schema}.gzzz_t WHERE gzzz010 = 'wf' AND gzzz006 = oobx003)
-          AND EXISTS (SELECT * FROM ${schema}.gzzz_t WHERE gzzz001 = REPLACE(oobx004, '_wf', ''))
-          AND oobxent = ${ent}
+          AND EXISTS (SELECT * FROM ${safeSchema}.gzzz_t WHERE gzzz010 = 'wf' AND gzzz006 = oobx003)
+          AND EXISTS (SELECT * FROM ${safeSchema}.gzzz_t WHERE gzzz001 = REPLACE(oobx004, '_wf', ''))
+          AND oobxent = ?
     `;
 
     logger.debug({ sql, schema, ent }, '[genAooi200] queryWfOobxData: 查询外部数据库');
-    const result = await externalDB.query(sql);
-    const rows = result.rows as Record<string, unknown>[];
+    const rows = await safeQuery(sql, [ent]);
     logger.info({ schema, ent, count: rows.length }, '[genAooi200] queryWfOobxData: 查询完成');
 
     return rows.map(row => ({
@@ -1027,18 +1007,20 @@ export async function replaceOoblWfData(schema: string, ent: number, rows: WfOob
         return 0;
     }
 
+    const safeSchema = validateIdentifier(schema, 'schema');
     const oobx001List = Array.from(new Set(rows.map(r => r.oobx001).filter(Boolean)));
-    const inClause = oobx001List.map(v => `'${esc(v)}'`).join(', ');
+    const inPlaceholders = oobx001List.map(() => '?').join(', ');
 
-    // 在事务中执行 UPDATE + DELETE + INSERT，报错时自动回滚
-    return externalTransaction(async (exec) => {
-        const updateSql = `UPDATE ${schema}.oobx_t SET oobx004 = 'MULTI' WHERE oobxent = ${ent} AND oobx001 IN (${inClause})`;
+    return safeTransaction(async (exec) => {
+        const updateParams = [ent, ...oobx001List];
+        const updateSql = `UPDATE ${safeSchema}.oobx_t SET oobx004 = 'MULTI' WHERE oobxent = ? AND oobx001 IN (${inPlaceholders})`;
         logger.debug({ updateSql, schema, ent, oobx001Count: oobx001List.length }, '[genAooi200] replaceOoblWfData: 更新 oobx004 为 MULTI');
-        await exec(updateSql);
+        await exec(updateSql, ...updateParams);
 
-        const deleteSql = `DELETE FROM ${schema}.oobl_t WHERE ooblent = ${ent} AND oobl001 IN (${inClause})`;
+        const deleteParams = [ent, ...oobx001List];
+        const deleteSql = `DELETE FROM ${safeSchema}.oobl_t WHERE ooblent = ? AND oobl001 IN (${inPlaceholders})`;
         logger.debug({ deleteSql, schema, ent, oobx001Count: oobx001List.length }, '[genAooi200] replaceOoblWfData: 删除旧数据');
-        await exec(deleteSql);
+        await exec(deleteSql, ...deleteParams);
 
         let insertedCount = 0;
         for (const row of rows) {
@@ -1046,8 +1028,8 @@ export async function replaceOoblWfData(schema: string, ent: number, rows: WfOob
             const oobx004Clean = oobx004.replace(/_wf$/, '');
 
             for (const val of [oobx004, oobx004Clean]) {
-                const insertSql = `INSERT INTO ${schema}.oobl_t (ooblent, oobl001, oobl002) VALUES ('${esc(String(ent))}', '${esc(row.oobx001)}', '${esc(val)}')`;
-                await exec(insertSql);
+                const insertSql = `INSERT INTO ${safeSchema}.oobl_t (ooblent, oobl001, oobl002) VALUES (?, ?, ?)`;
+                await exec(insertSql, ent, row.oobx001, val);
                 insertedCount++;
             }
         }
@@ -1113,19 +1095,19 @@ export async function queryOobaByRef(
         throw new Error('[genAooi200] 外部数据库未连接，无法查询单据别参照表');
     }
 
+    const safeSchema = validateIdentifier(schema, 'schema');
     const sql = `
         SELECT ooba002, oobxl003, oobx002, oobx003, oobx004
-        FROM ${schema}.ooba_t
-        LEFT JOIN ${schema}.oobx_t ON oobaent = oobxent AND ooba002 = oobx001
-        LEFT JOIN ${schema}.oobxl_t ON oobx001 = oobxl001 AND oobxent = oobxlent AND oobxl002 = 'zh_CN'
-        WHERE oobaent = ${ent}
-          AND ooba001 = '${esc(ooba001)}'
+        FROM ${safeSchema}.ooba_t
+        LEFT JOIN ${safeSchema}.oobx_t ON oobaent = oobxent AND ooba002 = oobx001
+        LEFT JOIN ${safeSchema}.oobxl_t ON oobx001 = oobxl001 AND oobxent = oobxlent AND oobxl002 = 'zh_CN'
+        WHERE oobaent = ?
+          AND ooba001 = ?
         ORDER BY ooba002
     `;
 
     logger.debug({ sql, schema, ent, ooba001 }, '[genAooi200] queryOobaByRef: 查询单据别参照表');
-    const result = await externalDB.query(sql);
-    const rows = result.rows as Record<string, unknown>[];
+    const rows = await safeQuery(sql, [ent, ooba001]);
     logger.info({ schema, ent, ooba001, count: rows.length }, '[genAooi200] queryOobaByRef: 查询完成');
 
     return rows.map(row => ({
@@ -1199,8 +1181,11 @@ export async function compareOobaRef(
 async function createBackupTable(
     schema: string, table: string, ts: number,
 ): Promise<string> {
-    const backupTable = `${table}_bck_${ts}`;
-    const sql = `CREATE TABLE ${schema}.${backupTable} AS SELECT * FROM ${schema}.${table}`;
+    const safeSchema = validateIdentifier(schema, 'schema');
+    const safeTable = validateIdentifier(table, 'table');
+    const backupTable = `${safeTable}_bck_${ts}`;
+    validateIdentifier(backupTable, 'backup table name');
+    const sql = `CREATE TABLE ${safeSchema}.${backupTable} AS SELECT * FROM ${safeSchema}.${safeTable}`;
     logger.debug({ sql }, '[genAooi200] createBackupTable: %s', backupTable);
     await externalDB.query(sql);
     return backupTable;
@@ -1241,14 +1226,14 @@ export async function validateDocConfig(
         return [];
     }
 
-    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
+    const safeSchemaFrom = validateIdentifier(schemaFrom, 'schemaFrom');
+    const inPlaceholders = ooba002List.map(() => '?').join(', ');
     const ent2Str = String(ent2);
     const errors: ValidateError[] = [];
 
     for (const { table, entCol, refCol, docCol } of docConfigTables) {
-        const selectSql = `SELECT * FROM ${schemaFrom}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
-        const srcResult = await externalDB.query(selectSql);
-        const srcRows = srcResult.rows as Record<string, unknown>[];
+        const selectSql = `SELECT * FROM ${safeSchemaFrom}.${table} WHERE ${entCol} = ? AND ${refCol} = ? AND ${docCol} IN (${inPlaceholders})`;
+        const srcRows = await safeQuery(selectSql, [ent1, ooba001From, ...ooba002List]);
 
         if (srcRows.length === 0) continue;
 
@@ -1321,7 +1306,9 @@ export async function copyDocConfig(
     }
 
     const ts = Math.floor(Date.now() / 1000);
-    const inClause = ooba002List.map(v => `'${esc(v)}'`).join(', ');
+    const inPlaceholders = ooba002List.map(() => '?').join(', ');
+    const safeSchemaFrom = validateIdentifier(schemaFrom, 'schemaFrom');
+    const safeSchemaTo = validateIdentifier(schemaTo, 'schemaTo');
 
     // Step 1: 整表备份（备份 schemaTo 下全部配置表数据，DDL 自动提交）
     const backedUpTables: string[] = [];
@@ -1339,13 +1326,12 @@ export async function copyDocConfig(
     }
 
     // Step 3: 校验全部通过，在事务中执行 DELETE(schemaTo, ent2, ooba001To) + INSERT(替换 ent 和 refCol)
-    const results = await externalTransaction(async (exec) => {
+    const results = await safeTransaction(async (exec) => {
         const stepResults: { table: string; deleted: number; inserted: number }[] = [];
 
         for (const { table, entCol, refCol, docCol } of docConfigTables) {
-            const selectSql = `SELECT * FROM ${schemaFrom}.${table} WHERE ${entCol} = ${ent1} AND ${refCol} = '${esc(ooba001From)}' AND ${docCol} IN (${inClause})`;
-            const srcResult = await externalDB.query(selectSql);
-            const srcRows = srcResult.rows as Record<string, unknown>[];
+            const selectSql = `SELECT * FROM ${safeSchemaFrom}.${table} WHERE ${entCol} = ? AND ${refCol} = ? AND ${docCol} IN (${inPlaceholders})`;
+            const srcRows = await safeQuery(selectSql, [ent1, ooba001From, ...ooba002List]);
             if (srcRows.length === 0) {
                 stepResults.push({ table, deleted: 0, inserted: 0 });
                 continue;
@@ -1353,8 +1339,9 @@ export async function copyDocConfig(
 
             const cols = Object.keys(srcRows[0]);
 
-            const deleteSql = `DELETE FROM ${schemaTo}.${table} WHERE ${entCol} = ${ent2} AND ${refCol} = '${esc(ooba001To)}' AND ${docCol} IN (${inClause})`;
-            await exec(deleteSql);
+            const deleteParams = [ent2, ooba001To, ...ooba002List];
+            const deleteSql = `DELETE FROM ${safeSchemaTo}.${table} WHERE ${entCol} = ? AND ${refCol} = ? AND ${docCol} IN (${inPlaceholders})`;
+            await exec(deleteSql, ...deleteParams);
 
             let inserted = 0;
             for (const srcRow of srcRows) {
@@ -1364,15 +1351,15 @@ export async function copyDocConfig(
                     [refCol.toLowerCase()]: ooba001To, [refCol.toUpperCase()]: ooba001To,
                 };
                 const colList = cols.map(c => `"${c}"`).join(', ');
-                const valList = cols.map(c => {
+                const placeholders = cols.map(() => '?').join(', ');
+                const values = cols.map(c => {
                     const v = row[c.toLowerCase()] ?? row[c.toUpperCase()] ?? row[c];
-                    if (v === null || v === undefined) return 'NULL';
-                    if (typeof v === 'number') return String(v);
-                    if (v instanceof Date) return `'${v.toISOString().replace('T', ' ').replace('Z', '')}'`;
-                    return `'${esc(String(v))}'`;
-                }).join(', ');
-                const insertSql = `INSERT INTO ${schemaTo}.${table} (${colList}) VALUES (${valList})`;
-                await exec(insertSql);
+                    if (v === null || v === undefined) return null;
+                    if (v instanceof Date) return v.toISOString().replace('T', ' ').replace('Z', '');
+                    return v;
+                });
+                const insertSql = `INSERT INTO ${safeSchemaTo}.${table} (${colList}) VALUES (${placeholders})`;
+                await exec(insertSql, ...values);
                 inserted++;
             }
 
@@ -1401,6 +1388,7 @@ export async function restoreFromBackup(
         throw new Error('[genAooi200] 外部数据库未连接，无法从备份恢复');
     }
 
+    const safeSchema = validateIdentifier(schema, 'schema');
     const restored: string[] = [];
 
     for (const { table } of docConfigTables) {
@@ -1408,16 +1396,16 @@ export async function restoreFromBackup(
 
         // 检查备份表是否存在
         try {
-            await externalDB.query(`SELECT 1 FROM ${schema}.${backupTable} WHERE 1=0`);
+            await externalDB.query(`SELECT 1 FROM ${safeSchema}.${backupTable} WHERE 1=0`);
         } catch {
             logger.warn('[genAooi200] restoreFromBackup: 备份表不存在，跳过 %s', backupTable);
             continue;
         }
 
-        await externalTransaction(async (exec) => {
-            await exec(`DELETE FROM ${schema}.${table}`);
-            await exec(`INSERT INTO ${schema}.${table} SELECT * FROM ${schema}.${backupTable}`);
-            await exec(`DROP TABLE ${schema}.${backupTable}`);
+        await safeTransaction(async (exec) => {
+            await exec(`DELETE FROM ${safeSchema}.${table}`);
+            await exec(`INSERT INTO ${safeSchema}.${table} SELECT * FROM ${safeSchema}.${backupTable}`);
+            await exec(`DROP TABLE ${safeSchema}.${backupTable}`);
         });
 
         restored.push(backupTable);
@@ -1439,6 +1427,7 @@ export async function cleanBackups(schema: string, timestamp?: number): Promise<
         throw new Error('[genAooi200] 外部数据库未连接，无法清理备份表');
     }
 
+    const safeSchema = validateIdentifier(schema, 'schema');
     const cleaned: string[] = [];
 
     if (timestamp !== undefined) {
@@ -1446,7 +1435,7 @@ export async function cleanBackups(schema: string, timestamp?: number): Promise<
         for (const { table } of docConfigTables) {
             const backupTable = `${table}_bck_${timestamp}`;
             try {
-                await externalDB.query(`DROP TABLE ${schema}.${backupTable}`);
+                await externalDB.query(`DROP TABLE ${safeSchema}.${backupTable}`);
                 cleaned.push(backupTable);
                 logger.info('[genAooi200] cleanBackups: 已删除 %s', backupTable);
             } catch {
@@ -1458,19 +1447,19 @@ export async function cleanBackups(schema: string, timestamp?: number): Promise<
         const dbType = externalDB.dbType;
         let findSql: string;
         if (dbType === 'oracle') {
-            findSql = `SELECT table_name FROM all_tables WHERE owner = UPPER('${esc(schema)}') AND table_name LIKE '%_BCK\\_%' ESCAPE '\\'`;
+            findSql = `SELECT table_name FROM all_tables WHERE owner = UPPER(?) AND table_name LIKE '%_BCK\\_%' ESCAPE '\\'`;
         } else {
-            findSql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${esc(schema)}' AND table_name LIKE '%_bck_%'`;
+            findSql = `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_name LIKE '%_bck_%'`;
         }
 
         try {
-            const result = await externalDB.query(findSql);
-            const rows = result.rows as Record<string, unknown>[];
+            const rows = await safeQuery(findSql, [schema]);
             for (const row of rows) {
                 const tname = String(row['table_name'] ?? row['TABLE_NAME'] ?? '');
                 if (!tname) continue;
+                validateIdentifier(tname, 'backup table name');
                 try {
-                    await externalDB.query(`DROP TABLE ${schema}.${tname}`);
+                    await externalDB.query(`DROP TABLE ${safeSchema}.${tname}`);
                     cleaned.push(tname);
                     logger.info('[genAooi200] cleanBackups: 已删除 %s', tname);
                 } catch (err) {
@@ -1505,13 +1494,12 @@ export async function listBackupTimestamps(schema: string): Promise<BackupVersio
     const dbType = externalDB.dbType;
     let findSql: string;
     if (dbType === 'oracle') {
-        findSql = `SELECT table_name FROM all_tables WHERE owner = UPPER('${esc(schema)}') AND table_name LIKE '%_BCK\\_%' ESCAPE '\\'`;
+        findSql = `SELECT table_name FROM all_tables WHERE owner = UPPER(?) AND table_name LIKE '%_BCK\\_%' ESCAPE '\\'`;
     } else {
-        findSql = `SELECT table_name FROM information_schema.tables WHERE table_schema = '${esc(schema)}' AND table_name LIKE '%_bck_%'`;
+        findSql = `SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_name LIKE '%_bck_%'`;
     }
 
-    const result = await externalDB.query(findSql);
-    const rows = result.rows as Record<string, unknown>[];
+    const rows = await safeQuery(findSql, [schema]);
 
     // 按时间戳分组
     const groupMap = new Map<number, string[]>();
@@ -1545,16 +1533,17 @@ export async function listBackupTimestamps(schema: string): Promise<BackupVersio
 */
 async function ooba001Chk(ooba001: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
     logger.debug({ ooba001, entTo, schemaTo }, 'ooba001Chk: 校验参照表编号');
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
     const sql_ooal_count = `
-        SELECT COUNT(*) AS cnt FROM ${schemaTo}.ooal_t
-        WHERE ooal001 ='3'
-        AND ooal002 = '${ooba001}'
-        AND ooalent = '${entTo}'
+        SELECT COUNT(*) AS cnt FROM ${safeSchema}.ooal_t
+        WHERE ooal001 = ?
+        AND ooal002 = ?
+        AND ooalent = ?
         `;
     logger.debug({ sql: sql_ooal_count }, 'ooba001Chk: 查询参照表编号');
-    const countResult = await externalDB.query(sql_ooal_count);
+    const rows = await safeQuery(sql_ooal_count, ['3', ooba001, entTo]);
 
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    const count = Number(rows[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ ooba001 }, 'ooba001Chk: 参照表编号不存在');
         return { table: 'ooba_t', field: 'ooba001', label: '参照表编号', value: ooba001, message: `[ooba_t] 参照表编号 [${ooba001}] 在参照表定义表(ooal_t, 类别=3)中不存在` };
@@ -1572,14 +1561,15 @@ async function ooba001Chk(ooba001: string, entTo: string, schemaTo: string): Pro
 */
 async function ooba002Chk(ooba002: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
     logger.debug({ ooba002, entTo, schemaTo }, 'ooba002Chk: 校验单据别编号');
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
     const sql_oobx_count_ooba = `
-        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oobx_t
-        WHERE oobxent = '${entTo}'
-        AND oobx001 = '${ooba002}'
+        SELECT COUNT(*) AS cnt FROM ${safeSchema}.oobx_t
+        WHERE oobxent = ?
+        AND oobx001 = ?
         `;
     logger.debug({ sql: sql_oobx_count_ooba }, 'ooba002Chk: 查询单据别编号');
-    const countResult = await externalDB.query(sql_oobx_count_ooba);
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    const rows = await safeQuery(sql_oobx_count_ooba, [entTo, ooba002]);
+    const count = Number(rows[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ ooba002 }, 'ooba002Chk: 单据别编号不存在');
         return { table: 'ooba_t', field: 'ooba002', label: '单据别编号', value: ooba002, message: `[ooba_t] 单据别编号 [${ooba002}] 在单据别定义表(oobx_t)中不存在` };
@@ -1599,13 +1589,14 @@ async function ooba002Chk(ooba002: string, entTo: string, schemaTo: string): Pro
 async function oobb004Chk(oobb004: string, ooba002: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
     logger.debug({ oobb004, ooba002, entTo, schemaTo }, 'oobb004Chk: 校验字段编号');
     // v_dzeb001_2
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
     const sql_dzeb_count = `
-        SELECT COUNT(*) AS cnt FROM ${schemaTo}.dzeb_t,${schemaTo}.dzac_t LEFT JOIN ${schemaTo}.gzzz_t ON dzac001 = gzzz002 
-        WHERE dzeb002 = dzac002 AND dzeb001 = dzac005 AND dzeb002 = '${oobb004}' AND gzzz001 IN (SELECT oobl002 FROM ${schemaTo}.oobl_t WHERE oobl001= '${ooba002}' AND ooblent = '${entTo}')
+        SELECT COUNT(*) AS cnt FROM ${safeSchema}.dzeb_t,${safeSchema}.dzac_t LEFT JOIN ${safeSchema}.gzzz_t ON dzac001 = gzzz002
+        WHERE dzeb002 = dzac002 AND dzeb001 = dzac005 AND dzeb002 = ? AND gzzz001 IN (SELECT oobl002 FROM ${safeSchema}.oobl_t WHERE oobl001= ? AND ooblent = ?)
         `;
     logger.debug({ sql: sql_dzeb_count }, 'oobb004Chk: 查询字段编号');
-    const countResult = await externalDB.query(sql_dzeb_count);
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    const rows = await safeQuery(sql_dzeb_count, [oobb004, ooba002, entTo]);
+    const count = Number(rows[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ oobb004, ooba002 }, 'oobb004Chk: 字段编号校验不通过');
         return { table: 'oobb_t', field: 'oobb004', label: '字段编号', value: oobb004, message: `[oobb_t] 字段编号 [${oobb004}] 不存在于单据别 [${ooba002}]` };
@@ -1623,18 +1614,19 @@ async function oobb004Chk(oobb004: string, ooba002: string, entTo: string, schem
 */
 async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
     logger.debug({ oobc003, oobc004, entTo, schemaTo }, 'oobc003Chk: 校验控制组编号');
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
 
     if (oobc004 === '8') {
         // 员工类型控制组 v_ooag001
         const sql_ooag_count = `
             SELECT COUNT(*) AS cnt
-            FROM ${schemaTo}.ooag_t
-            WHERE ooagent = '${entTo}'
-              AND ooag001 = '${oobc003}'
+            FROM ${safeSchema}.ooag_t
+            WHERE ooagent = ?
+              AND ooag001 = ?
             `;
         logger.debug({ sql: sql_ooag_count }, 'oobc003Chk: 查询员工类型控制组');
-        const countResult = await externalDB.query(sql_ooag_count);
-        const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+        const rows = await safeQuery(sql_ooag_count, [entTo, oobc003]);
+        const count = Number(rows[0]?.cnt ?? 0);
         if (count === 0) {
             logger.warn({ oobc003, oobc004: '8' }, 'oobc003Chk: 员工类型控制组编号不存在');
             return { table: 'oobc_t', field: 'oobc003', label: '控制组编号', value: oobc003, message: `[oobc_t] 控制组编号(员工类型) [${oobc003}] 在员工数据表(ooag_t)中不存在` };
@@ -1643,13 +1635,13 @@ async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schem
         // 部门类型控制组 v_ooeg001
         const sql_ooeg_count = `
             SELECT COUNT(*) AS cnt
-            FROM ${schemaTo}.ooeg_t
-            WHERE ooeg001 = '${oobc003}'
-              AND ooegent = '${entTo}'
+            FROM ${safeSchema}.ooeg_t
+            WHERE ooeg001 = ?
+              AND ooegent = ?
             `;
         logger.debug({ sql: sql_ooeg_count }, 'oobc003Chk: 查询部门类型控制组');
-        const countResult = await externalDB.query(sql_ooeg_count);
-        const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+        const rows = await safeQuery(sql_ooeg_count, [oobc003, entTo]);
+        const count = Number(rows[0]?.cnt ?? 0);
         if (count === 0) {
             logger.warn({ oobc003, oobc004: '7' }, 'oobc003Chk: 部门类型控制组编号不存在');
             return { table: 'oobc_t', field: 'oobc003', label: '控制组编号', value: oobc003, message: `[oobc_t] 控制组编号(部门类型) [${oobc003}] 在部门数据表(ooeg_t)中不存在` };
@@ -1658,14 +1650,14 @@ async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schem
         //  一般控制组 v_ooha001_5
         const sql_ooha_count = `
             SELECT COUNT(*) AS cnt
-            FROM ${schemaTo}.ooha_t
-            WHERE oohaent = '${entTo}'
-              AND ooha001 = '${oobc003}'
-              AND ooha002 = '${oobc004}'
+            FROM ${safeSchema}.ooha_t
+            WHERE oohaent = ?
+              AND ooha001 = ?
+              AND ooha002 = ?
             `;
         logger.debug({ sql: sql_ooha_count }, 'oobc003Chk: 查询一般类型控制组');
-        const countResult = await externalDB.query(sql_ooha_count);
-        const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+        const rows = await safeQuery(sql_ooha_count, [entTo, oobc003, oobc004]);
+        const count = Number(rows[0]?.cnt ?? 0);
         if (count === 0) {
             logger.warn({ oobc003, oobc004 }, 'oobc003Chk: 一般类型控制组编号不存在');
             return { table: 'oobc_t', field: 'oobc003', label: '控制组编号', value: oobc003, message: `[oobc_t] 控制组编号(一般类型) [${oobc003}]（控制组类型 [${oobc004}]）在一般控制组表(ooha_t)中不存在` };
@@ -1685,15 +1677,16 @@ async function oobc003Chk(oobc003: string, oobc004: string, entTo: string, schem
 async function oobd004Chk(oobd003: string, oobd004: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
     logger.debug({ oobd003, oobd004, entTo, schemaTo }, 'oobd004Chk: 校验生命周期编号');
     // ACC 应用分类码
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
     const sql_oocq_oobd = `
-        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oocq_t
-        WHERE oocqent = '${entTo}'
-        AND oocq001 = '${oobd003}'
-        AND oocq002 = '${oobd004}'
+        SELECT COUNT(*) AS cnt FROM ${safeSchema}.oocq_t
+        WHERE oocqent = ?
+        AND oocq001 = ?
+        AND oocq002 = ?
         `;
     logger.debug({ sql: sql_oocq_oobd }, 'oobd004Chk: 查询生命周期编号');
-    const countResult = await externalDB.query(sql_oocq_oobd)
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    const rows = await safeQuery(sql_oocq_oobd, [entTo, oobd003, oobd004])
+    const count = Number(rows[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ oobd003, oobd004 }, 'oobd004Chk: 生命周期编号不存在');
         return { table: 'oobd_t', field: 'oobd004', label: '生命周期编号', value: oobd004, message: `[oobd_t] 生命周期编号 [${oobd004}]（生命周期类型 [${oobd003}]）在应用分类码表(oocq_t)中不存在` };
@@ -1710,14 +1703,15 @@ async function oobd004Chk(oobd003: string, oobd004: string, entTo: string, schem
 */
 async function oobh003Chk(oobh003: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
     logger.debug({ oobh003, entTo, schemaTo }, 'oobh003Chk: 校验产品分类');
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
     const sql_rtax_count = `
-        SELECT COUNT(*) AS cnt FROM ${schemaTo}.rtax_t
-        WHERE rtaxent = '${entTo}'
-        AND (rtax001 = '${oobh003}' OR '${oobh003}' =' ')
+        SELECT COUNT(*) AS cnt FROM ${safeSchema}.rtax_t
+        WHERE rtaxent = ?
+        AND (rtax001 = ? OR ? = ' ')
         `;
     logger.debug({ sql: sql_rtax_count }, 'oobh003Chk: 查询产品分类');
-    const countResult = await externalDB.query(sql_rtax_count);
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    const rows = await safeQuery(sql_rtax_count, [entTo, oobh003, oobh003]);
+    const count = Number(rows[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ oobh003 }, 'oobh003Chk: 产品分类不存在');
         return { table: 'oobh_t', field: 'oobh003', label: '产品分类', value: oobh003, message: `[oobh_t] 产品分类 [${oobh003}] 在产品分类表(rtax_t)中不存在` };
@@ -1735,19 +1729,18 @@ async function oobh003Chk(oobh003: string, entTo: string, schemaTo: string): Pro
 */
 async function oobi003Chk(ooba002: string, oobi003: string, entTo: string, schemaTo: string): Promise<ValidateError | null> {
     logger.debug({ ooba002, oobi003, entTo, schemaTo }, 'oobi003Chk: 校验单身理由码');
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
 
     const sql_gzcb_acc = `
         SELECT gzcb004
-        FROM ${schemaTo}.gzcb_t,${schemaTo}.oobx_t
+        FROM ${safeSchema}.gzcb_t,${safeSchema}.oobx_t
         WHERE gzcb001 = 24
         AND gzcb002 = oobx003
-        AND oobx001 = '${ooba002}'
-        AND oobxent = '${entTo}'
+        AND oobx001 = ?
+        AND oobxent = ?
         `;
     logger.debug({ sql: sql_gzcb_acc }, 'oobi003Chk: 查询单身理由码 ACC 类别');
-    const accResult = await externalDB.query(sql_gzcb_acc);
-
-    const rows = accResult.rows as Record<string, unknown>[];
+    const rows = await safeQuery(sql_gzcb_acc, [ooba002, entTo]);
 
     if (rows.length === 0) {
         logger.warn({ oobi003, ooba002 }, 'oobi003Chk: 单身理由码对应的应用分类码查询无结果');
@@ -1757,14 +1750,14 @@ async function oobi003Chk(ooba002: string, oobi003: string, entTo: string, schem
     const acc = rows[0]['gzcb004'];
 
     const sql_oocq_oobi = `
-        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oocq_t
-        WHERE oocqent = '${entTo}'
-        AND oocq001 = '${acc}'
-        AND oocq002 = '${oobi003}'
+        SELECT COUNT(*) AS cnt FROM ${safeSchema}.oocq_t
+        WHERE oocqent = ?
+        AND oocq001 = ?
+        AND oocq002 = ?
         `;
     logger.debug({ sql: sql_oocq_oobi }, 'oobi003Chk: 查询单身理由码是否存在');
-    const countResult = await externalDB.query(sql_oocq_oobi)
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    const countRows = await safeQuery(sql_oocq_oobi, [entTo, acc, oobi003])
+    const count = Number(countRows[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ oobi003, acc }, 'oobi003Chk: 单身理由码在应用分类码表中不存在');
         return { table: 'oobi_t', field: 'oobi003', label: '单身理由码', value: oobi003, message: `[oobi_t] 单身理由码 [${oobi003}]（ACC [${acc}]）在应用分类码表(oocq_t)中不存在` };
@@ -1785,15 +1778,16 @@ async function oobi003Chk(ooba002: string, oobi003: string, entTo: string, schem
 async function oobj003Chk(oobj003: string, entTo: string, schemaTo: string, table = 'oobj_t', field = 'oobj003', label = '库存标签编号F'): Promise<ValidateError | null> {
     logger.debug({ oobj003, entTo, schemaTo, table, field, label }, 'oobj003Chk: 校验库存标签编号');
     // ACC 应用分类码
+    const safeSchema = validateIdentifier(schemaTo, 'schemaTo');
     const sql_oocq_oobj = `
-        SELECT COUNT(*) AS cnt FROM ${schemaTo}.oocq_t
-        WHERE oocqent = '${entTo}'
+        SELECT COUNT(*) AS cnt FROM ${safeSchema}.oocq_t
+        WHERE oocqent = ?
         AND oocq001 = '220'
-        AND oocq002 = '${oobj003}'
+        AND oocq002 = ?
         `;
     logger.debug({ sql: sql_oocq_oobj }, 'oobj003Chk: 查询库存标签编号');
-    const countResult = await externalDB.query(sql_oocq_oobj)
-    const count = Number((countResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+    const rows = await safeQuery(sql_oocq_oobj, [entTo, oobj003])
+    const count = Number(rows[0]?.cnt ?? 0);
     if (count === 0) {
         logger.warn({ [field]: oobj003, table }, 'oobj003Chk: 库存标签编号不存在');
         return { table, field, label, value: oobj003, message: `[${table}] ${label} [${oobj003}] 在应用分类码表(oocq_t, ACC=220)中不存在` };
@@ -1812,10 +1806,10 @@ export async function queryOoba001List(schema: string, ent: number): Promise<str
         throw new Error('[genAooi200] 外部数据库未连接，无法查询参照表列表');
     }
 
-    const sql = `SELECT ooal002 FROM ${schema}.ooal_t WHERE ooal001 = 3 AND ooalent = ${ent} ORDER BY ooal002`;
+    const safeSchema = validateIdentifier(schema, 'schema');
+    const sql = `SELECT ooal002 FROM ${safeSchema}.ooal_t WHERE ooal001 = 3 AND ooalent = ? ORDER BY ooal002`;
     logger.debug({ sql, schema, ent }, '[genAooi200] queryOoba001List: 查询可用参照表');
-    const result = await externalDB.query(sql);
-    const rows = result.rows as Record<string, unknown>[];
+    const rows = await safeQuery(sql, [ent]);
     const list = rows.map(row => String(row['ooal002'] ?? row['OOAL002'] ?? '')).filter(Boolean);
     logger.info({ schema, ent, count: list.length }, '[genAooi200] queryOoba001List: 查询完成');
     return list;

@@ -1,6 +1,7 @@
 import { externalDB } from '../db/clients';
 import { dbConnectionManager } from '../config/db-connections';
 import logger from '../utils/logger';
+import { validateIdentifier, safeQuery, safeExec } from '../utils/sql-utils';
 
 // ==================== 类型定义 ====================
 
@@ -88,9 +89,8 @@ export class SyncAzzi001Service {
 
     for (const table of AZZI001_SYNC_TABLES) {
       try {
-        const sql = `SELECT COUNT(*) AS cnt FROM "${table.tableName}" WHERE "${table.entField}" = ${sourceEnt}`;
-        const queryResult = await externalDB.query(sql);
-        const rows = queryResult.rows as Record<string, unknown>[];
+        const sql = `SELECT COUNT(*) AS cnt FROM "${validateIdentifier(table.tableName, 'tableName')}" WHERE "${validateIdentifier(table.entField, 'entField')}" = ?`;
+        const rows = await safeQuery(sql, [sourceEnt]);
         const count = Number(rows[0]?.cnt ?? 0);
 
         results.push({
@@ -130,50 +130,49 @@ export class SyncAzzi001Service {
       verifyCount: 0,
     };
 
-    const tempTable = `${tableName}_temp`;
+    const safeTable = validateIdentifier(tableName, 'tableName');
+    const safeField = validateIdentifier(entField, 'entField');
+    const tempTable = `${safeTable}_temp`;
+    validateIdentifier(tempTable, 'tempTable');
 
     try {
-      // 1. 创建临时表：复制源 ENT 数据
+      // 1. 创建临时表：复制源 ENT 数据（DDL 不能参数化标识符，但标识符已校验）
       await externalDB.query(
-        `CREATE TABLE "${tempTable}" AS SELECT * FROM "${tableName}" WHERE "${entField}" = ${sourceEnt}`
+        `CREATE TABLE "${tempTable}" AS SELECT * FROM "${safeTable}" WHERE "${safeField}" = ${sourceEnt}`
       );
       logger.info('[SyncAzzi001Service] %s: 创建临时表完成', tableName);
 
       // 2. 更新临时表中的 ENT 字段为目标值
       await externalDB.query(
-        `UPDATE "${tempTable}" SET "${entField}" = ${targetEnt}`
+        `UPDATE "${tempTable}" SET "${safeField}" = ${targetEnt}`
       );
       logger.info('[SyncAzzi001Service] %s: 更新临时表ENT字段完成', tableName);
 
       // 3. 查询临时表条数
-      const tempCountResult = await externalDB.query(
-        `SELECT COUNT(*) AS cnt FROM "${tempTable}"`
-      );
-      result.tempCount = Number((tempCountResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+      const tempRows = await safeQuery(`SELECT COUNT(*) AS cnt FROM "${tempTable}"`);
+      result.tempCount = Number(tempRows[0]?.cnt ?? 0);
 
       // 4. 删除目标 ENT 在原表中的数据
-      const deleteResult = await externalDB.query(
-        `DELETE FROM "${tableName}" WHERE "${entField}" = ${targetEnt}`
+      const deleteResult = await safeExec(
+        `DELETE FROM "${safeTable}" WHERE "${safeField}" = ?`,
+        [targetEnt],
       );
-      // pg 返回 rowCount，Oracle 返回 rowsAffected
-      const deleteRows = (deleteResult as { rowCount?: number }).rowCount
-        ?? (deleteResult as { rowsAffected?: number }).rowsAffected
-        ?? 0;
-      result.deletedCount = Number(deleteRows);
+      result.deletedCount = deleteResult.rowCount ?? deleteResult.rowsAffected ?? 0;
       logger.info('[SyncAzzi001Service] %s: 删除目标ENT数据 %d 条', tableName, result.deletedCount);
 
-      // 5. 从临时表插入到原表
+      // 5. 从临时表插入到原表（DDL 不能参数化标识符）
       await externalDB.query(
-        `INSERT INTO "${tableName}" SELECT * FROM "${tempTable}"`
+        `INSERT INTO "${safeTable}" SELECT * FROM "${tempTable}"`
       );
       result.insertedCount = result.tempCount;
       logger.info('[SyncAzzi001Service] %s: 插入数据 %d 条', tableName, result.insertedCount);
 
       // 6. 验证目标 ENT 数据条数
-      const verifyResult = await externalDB.query(
-        `SELECT COUNT(*) AS cnt FROM "${tableName}" WHERE "${entField}" = ${targetEnt}`
+      const verifyRows = await safeQuery(
+        `SELECT COUNT(*) AS cnt FROM "${safeTable}" WHERE "${safeField}" = ?`,
+        [targetEnt],
       );
-      result.verifyCount = Number((verifyResult.rows as Record<string, unknown>[])[0]?.cnt ?? 0);
+      result.verifyCount = Number(verifyRows[0]?.cnt ?? 0);
 
       result.success = true;
       logger.info('[SyncAzzi001Service] %s: 同步完成，验证条数 %d', tableName, result.verifyCount);

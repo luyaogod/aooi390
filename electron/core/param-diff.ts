@@ -2,6 +2,7 @@ import { externalDB } from '../db/clients';
 import { dbConnectionManager } from '../config/db-connections';
 import logger from '../utils/logger';
 import { queryEnt, querySites } from '../com-query/external';
+import { validateIdentifier, safeQuery } from '../utils/sql-utils';
 
 /** 集团级参数行 */
 export interface EnterpriseParamRow {
@@ -52,14 +53,15 @@ export class ParamDiffService {
     try {
       const schemaMap = await resolveSchemaMap();
       const schema = schemaMap[ent] || ent;
+      const safeSchema = validateIdentifier(schema, 'schema');
       const sql = `SELECT ooaaent, ooaa001, ooaa002, gzszl004, gzszl005, gzszl006, gzszl007
-FROM ${schema}.ooaa_t
-LEFT JOIN ${schema}.gzszl_t ON ooaa001 = gzszl002 AND gzszl001 = 'ooaa_t' AND gzszl003 = '${dlang}'
-WHERE ooaaent = '${ent}'
+FROM ${safeSchema}.ooaa_t
+LEFT JOIN ${safeSchema}.gzszl_t ON ooaa001 = gzszl002 AND gzszl001 = 'ooaa_t' AND gzszl003 = ?
+WHERE ooaaent = ?
 ORDER BY ooaaent, ooaa001`;
-      logger.debug({ sql }, '[ParamDiffService] 查询集团级参数');
-      const result = await externalDB.query(sql);
-      return result.rows as EnterpriseParamRow[];
+      logger.debug({ sql, params: [dlang, ent] }, '[ParamDiffService] 查询集团级参数');
+      const rows = await safeQuery(sql, [dlang, ent]);
+      return rows as unknown as EnterpriseParamRow[];
     } catch (error) {
       logger.error(error, '[ParamDiffService] 查询集团级参数失败');
       throw error;
@@ -78,14 +80,15 @@ ORDER BY ooaaent, ooaa001`;
     try {
       const schemaMap = await resolveSchemaMap();
       const schema = schemaMap[ent] || ent;
+      const safeSchema = validateIdentifier(schema, 'schema');
       const sql = `SELECT ooabent, ooabsite, ooab001, ooab002, gzszl004, gzszl005, gzszl006, gzszl007
-FROM ${schema}.ooab_t
-LEFT JOIN ${schema}.gzszl_t ON ooab001 = gzszl002 AND gzszl001 = 'ooab_t' AND gzszl003 = '${dlang}'
-WHERE ooabent = '${ent}' AND ooabsite = '${site}'
+FROM ${safeSchema}.ooab_t
+LEFT JOIN ${safeSchema}.gzszl_t ON ooab001 = gzszl002 AND gzszl001 = 'ooab_t' AND gzszl003 = ?
+WHERE ooabent = ? AND ooabsite = ?
 ORDER BY ooabent, ooabsite, ooab001`;
-      logger.debug({ sql }, '[ParamDiffService] 查询据点级参数');
-      const result = await externalDB.query(sql);
-      return result.rows as SiteParamRow[];
+      logger.debug({ sql, params: [dlang, ent, site] }, '[ParamDiffService] 查询据点级参数');
+      const rows = await safeQuery(sql, [dlang, ent, site]);
+      return rows as unknown as SiteParamRow[];
     } catch (error) {
       logger.error(error, '[ParamDiffService] 查询据点级参数失败');
       throw error;
