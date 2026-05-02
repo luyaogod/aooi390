@@ -1070,7 +1070,7 @@ function GenAooi200Page() {
               <AlertTriangle className="size-4" />
               <AlertTitle>校验错误（共 {validateErrors.length} 项）</AlertTitle>
               <AlertDescription>
-                <div className="max-h-60 overflow-auto rounded-md border">
+                <div className="max-h-60 overflow-auto rounded-md">
                   <Table>
                     <TableHeader><TableRow><TableHead>表</TableHead><TableHead>字段</TableHead><TableHead>值</TableHead><TableHead>错误描述</TableHead></TableRow></TableHeader>
                     <TableBody>{validateErrors.map((e, i) => <TableRow key={i}><TableCell className="font-mono text-xs">{e.table}</TableCell><TableCell>{e.label}</TableCell><TableCell className="font-mono text-xs">{e.value}</TableCell><TableCell className="text-xs">{e.message}</TableCell></TableRow>)}</TableBody>
@@ -1091,7 +1091,7 @@ function GenAooi200Page() {
               <CheckCircle2 className="size-4" />
               <AlertTitle>同步完成（备份 ts={syncResult.timestamp}）</AlertTitle>
               <AlertDescription>
-                <div className="max-h-60 overflow-auto rounded-md border">
+                <div className="max-h-60 overflow-auto rounded-md">
                   <Table>
                     <TableHeader><TableRow><TableHead>表名</TableHead><TableHead>删除</TableHead><TableHead>插入</TableHead></TableRow></TableHeader>
                     <TableBody>{syncResult.results.map(r => <TableRow key={r.table}><TableCell className="font-mono">{r.table}</TableCell><TableCell>{r.deleted}</TableCell><TableCell>{r.inserted}</TableCell></TableRow>)}</TableBody>
