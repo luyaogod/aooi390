@@ -451,7 +451,7 @@ function ParamDiffPage() {
                     <SelectContent>
                       <SelectGroup>
                         {entList.map((ent) => (
-                          <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                          <SelectItem key={ent.gzou001} value={ent.gzou001}>{ent.gzou001}</SelectItem>
                         ))}
                       </SelectGroup>
                     </SelectContent>
@@ -490,7 +490,7 @@ function ParamDiffPage() {
                     <SelectContent>
                       <SelectGroup>
                         {entList.map((ent) => (
-                          <SelectItem key={ent} value={String(ent)}>{ent}</SelectItem>
+                          <SelectItem key={ent.gzou001} value={ent.gzou001}>{ent.gzou001}</SelectItem>
                         ))}
                       </SelectGroup>
                     </SelectContent>

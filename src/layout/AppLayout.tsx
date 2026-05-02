@@ -4,12 +4,10 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import {
-  FolderUp,
   GitMerge,
   Settings,
   GitCompare,
   ArrowUpFromLine
-
 } from 'lucide-react'
 
 interface NavItem {
