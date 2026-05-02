@@ -1239,7 +1239,7 @@ export async function copyDocConfig(
                     const v = row[c.toLowerCase()] ?? row[c.toUpperCase()] ?? row[c];
                     if (v === null || v === undefined) return 'NULL';
                     if (typeof v === 'number') return String(v);
-                    if (v instanceof Date) return `'${v.toISOString()}'`;
+                    if (v instanceof Date) return `'${v.toISOString().replace('T', ' ').replace('Z', '')}'`;
                     return `'${esc(String(v))}'`;
                 }).join(', ');
                 const insertSql = `INSERT INTO ${schemaTo}.${table} (${colList}) VALUES (${valList})`;
