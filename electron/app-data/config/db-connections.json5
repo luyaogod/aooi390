@@ -9,18 +9,18 @@
       "user"      /*用户名*/: "dsdata",
       "password"  /*密码*/: "dsdata",
     },
-    "isDefault" /*是否为默认连接*/: true,
+    "isDefault" /*是否为默认连接*/: false,
     "description" /*备注描述*/: "本地开发测试用 Kingbase 数据库",
   },
   {
-    "name" /*连接名称*/: "锡圆Oracle",
+    "name" /*连接名称*/: "惟清Oracle",
     "type" /*数据库类型*/: "oracle",
     "config": {
-      "user"          /*用户名*/: "scott",
-      "password"      /*密码*/: "tiger",
-      "connectString" /*连接字符串*/: "192.168.1.100:1521/ORCL",
+      "user" /*用户名*/: "dsdemo",
+      "password" /*密码*/: "dsdemo",
+      "connectString" /*连接字符串*/: "10.100.2.41:1521/topprd"
     },
-    "isDefault"   /*是否为默认连接*/: false,
-    "description" /*备注描述*/: "Oracle 数据库",
-  },
+    "isDefault" /*是否为默认连接*/: true,
+    "description" /*备注描述*/: "Oracle 数据库"
+  }
 ]

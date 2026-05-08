@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
-import * as oracledb from 'oracledb';
+import oracledb from 'oracledb';
 import { getSqliteDBPath } from '../utils/paths';
 import logger from '../utils/logger';
 
@@ -442,6 +442,23 @@ export class ExternalDBManager {
   // ==================== Oracle 相关方法 ====================
 
   /**
+   * Oracle 默认返回大写字段名（如 GZOU001），与 Kingbase/PostgreSQL 的小写不一致。
+   * 将结果行的字段名统一转换为小写，保证前端无需感知数据库差异。
+   */
+  private normalizeOracleRows<T>(rows: T[]): T[] {
+    return rows.map(row => {
+      if (row && typeof row === 'object' && !Array.isArray(row)) {
+        const normalized: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
+          normalized[key.toLowerCase()] = value;
+        }
+        return normalized as T;
+      }
+      return row;
+    });
+  }
+
+  /**
    * 连接到 Oracle 数据库
    */
   private async connectOracle(config: OracleConfig): Promise<void> {
@@ -491,6 +508,9 @@ export class ExternalDBManager {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
         ...options,
       });
+      if (result.rows) {
+        result.rows = this.normalizeOracleRows(result.rows);
+      }
       return result;
     } finally {
       await connection.close();
@@ -515,12 +535,11 @@ export class ExternalDBManager {
   ): Promise<T> {
     const connection = await this.getOracleConnection();
     try {
-      await connection.execute('BEGIN');
       const result = await callback(connection);
-      await connection.execute('COMMIT');
+      await connection.commit();
       return result;
     } catch (error) {
-      await connection.execute('ROLLBACK');
+      await connection.rollback();
       throw error;
     } finally {
       await connection.close();

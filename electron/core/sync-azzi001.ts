@@ -1,7 +1,8 @@
+import oracledb from 'oracledb';
 import { externalDB } from '../db/clients';
 import { dbConnectionManager } from '../config/db-connections';
 import logger from '../utils/logger';
-import { validateIdentifier, safeQuery, safeExec } from '../utils/sql-utils';
+import { validateIdentifier, safeQuery, safeExec, quoteIdent } from '../utils/sql-utils';
 
 // ==================== 类型定义 ====================
 
@@ -70,7 +71,9 @@ export class SyncAzzi001Service {
     await this.ensureConnected();
 
     try {
-      const result = await externalDB.query('SELECT gzou001 FROM gzou_t');
+      const sql = 'SELECT gzou001 FROM gzou_t';
+      logger.info('[SyncAzzi001Service] SQL: %s', sql);
+      const result = await externalDB.query(sql);
       const rows = result.rows as Record<string, unknown>[];
       return rows.map(row => Number(row.gzou001)).filter(n => !isNaN(n));
     } catch (error) {
@@ -89,7 +92,10 @@ export class SyncAzzi001Service {
 
     for (const table of AZZI001_SYNC_TABLES) {
       try {
-        const sql = `SELECT COUNT(*) AS cnt FROM "${validateIdentifier(table.tableName, 'tableName')}" WHERE "${validateIdentifier(table.entField, 'entField')}" = ?`;
+        const quotedTable = quoteIdent(table.tableName, 'tableName');
+        const quotedField = quoteIdent(table.entField, 'entField');
+        const sql = `SELECT COUNT(*) AS cnt FROM ${quotedTable} WHERE ${quotedField} = ?`;
+        logger.info('[SyncAzzi001Service] SQL: %s | params: %o', sql, [sourceEnt]);
         const rows = await safeQuery(sql, [sourceEnt]);
         const count = Number(rows[0]?.cnt ?? 0);
 
@@ -132,57 +138,110 @@ export class SyncAzzi001Service {
 
     const safeTable = validateIdentifier(tableName, 'tableName');
     const safeField = validateIdentifier(entField, 'entField');
+    const quotedTable = quoteIdent(safeTable);
+    const quotedField = quoteIdent(safeField);
     const tempTable = `${safeTable}_temp`;
     validateIdentifier(tempTable, 'tempTable');
+    const quotedTemp = quoteIdent(tempTable);
 
     try {
-      // 1. 创建临时表：复制源 ENT 数据（DDL 不能参数化标识符，但标识符已校验）
-      await externalDB.query(
-        `CREATE TABLE "${tempTable}" AS SELECT * FROM "${safeTable}" WHERE "${safeField}" = ${sourceEnt}`
-      );
+      // 1. 创建临时表：复制源 ENT 数据（DDL，Oracle 自动提交）
+      const sql1 = `CREATE TABLE ${quotedTemp} AS SELECT * FROM ${quotedTable} WHERE ${quotedField} = ${sourceEnt}`;
+      logger.info('[SyncAzzi001Service] SQL: %s', sql1);
+      await externalDB.query(sql1);
       logger.info('[SyncAzzi001Service] %s: 创建临时表完成', tableName);
 
-      // 2. 更新临时表中的 ENT 字段为目标值
-      await externalDB.query(
-        `UPDATE "${tempTable}" SET "${safeField}" = ${targetEnt}`
-      );
-      logger.info('[SyncAzzi001Service] %s: 更新临时表ENT字段完成', tableName);
+      if (externalDB.dbType === 'oracle') {
+        // Oracle DML 需在同一连接上执行并显式提交，否则 connection.close() 会回滚
+        const conn = await externalDB.getOracleConnection();
+        try {
+          // 2. 更新临时表中的 ENT 字段为目标值
+          const sql2 = `UPDATE ${quotedTemp} SET ${quotedField} = ${targetEnt}`;
+          logger.info('[SyncAzzi001Service] SQL: %s', sql2);
+          await conn.execute(sql2);
+          logger.info('[SyncAzzi001Service] %s: 更新临时表ENT字段完成', tableName);
 
-      // 3. 查询临时表条数
-      const tempRows = await safeQuery(`SELECT COUNT(*) AS cnt FROM "${tempTable}"`);
-      result.tempCount = Number(tempRows[0]?.cnt ?? 0);
+          // 3. 查询临时表条数
+          const sql3 = `SELECT COUNT(*) AS cnt FROM ${quotedTemp}`;
+          logger.info('[SyncAzzi001Service] SQL: %s', sql3);
+          const tempResult = await conn.execute(sql3, {}, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+          result.tempCount = Number((tempResult.rows as Record<string, unknown>[])?.[0]?.CNT ?? 0);
 
-      // 4. 删除目标 ENT 在原表中的数据
-      const deleteResult = await safeExec(
-        `DELETE FROM "${safeTable}" WHERE "${safeField}" = ?`,
-        [targetEnt],
-      );
-      result.deletedCount = deleteResult.rowCount ?? deleteResult.rowsAffected ?? 0;
-      logger.info('[SyncAzzi001Service] %s: 删除目标ENT数据 %d 条', tableName, result.deletedCount);
+          // 4. 删除目标 ENT 在原表中的数据
+          const sql4 = `DELETE FROM ${quotedTable} WHERE ${quotedField} = :p0`;
+          logger.info('[SyncAzzi001Service] SQL: %s | params: %o', sql4, [targetEnt]);
+          const deleteResult = await conn.execute(sql4, { p0: targetEnt });
+          result.deletedCount = deleteResult.rowsAffected ?? 0;
+          logger.info('[SyncAzzi001Service] %s: 删除目标ENT数据 %d 条', tableName, result.deletedCount);
 
-      // 5. 从临时表插入到原表（DDL 不能参数化标识符）
-      await externalDB.query(
-        `INSERT INTO "${safeTable}" SELECT * FROM "${tempTable}"`
-      );
-      result.insertedCount = result.tempCount;
-      logger.info('[SyncAzzi001Service] %s: 插入数据 %d 条', tableName, result.insertedCount);
+          // 5. 从临时表插入到原表
+          const sql5 = `INSERT INTO ${quotedTable} SELECT * FROM ${quotedTemp}`;
+          logger.info('[SyncAzzi001Service] SQL: %s', sql5);
+          await conn.execute(sql5);
+          result.insertedCount = result.tempCount;
+          logger.info('[SyncAzzi001Service] %s: 插入数据 %d 条', tableName, result.insertedCount);
 
-      // 6. 验证目标 ENT 数据条数
-      const verifyRows = await safeQuery(
-        `SELECT COUNT(*) AS cnt FROM "${safeTable}" WHERE "${safeField}" = ?`,
-        [targetEnt],
-      );
-      result.verifyCount = Number(verifyRows[0]?.cnt ?? 0);
+          // 6. 验证目标 ENT 数据条数
+          const sql6 = `SELECT COUNT(*) AS cnt FROM ${quotedTable} WHERE ${quotedField} = :p0`;
+          logger.info('[SyncAzzi001Service] SQL: %s | params: %o', sql6, [targetEnt]);
+          const verifyResult = await conn.execute(sql6, { p0: targetEnt }, { outFormat: oracledb.OUT_FORMAT_OBJECT });
+          result.verifyCount = Number((verifyResult.rows as Record<string, unknown>[])?.[0]?.CNT ?? 0);
 
-      result.success = true;
-      logger.info('[SyncAzzi001Service] %s: 同步完成，验证条数 %d', tableName, result.verifyCount);
+          await conn.commit();
+          result.success = true;
+          logger.info('[SyncAzzi001Service] %s: 同步完成，验证条数 %d', tableName, result.verifyCount);
+        } catch (error) {
+          await conn.rollback();
+          throw error;
+        } finally {
+          await conn.close();
+        }
+      } else {
+        // Kingbase: pg pool.query() 自动提交，现有方式即可
+        // 2. 更新临时表中的 ENT 字段为目标值
+        const sql2 = `UPDATE ${quotedTemp} SET ${quotedField} = ${targetEnt}`;
+        logger.info('[SyncAzzi001Service] SQL: %s', sql2);
+        await externalDB.query(sql2);
+        logger.info('[SyncAzzi001Service] %s: 更新临时表ENT字段完成', tableName);
+
+        // 3. 查询临时表条数
+        const sql3 = `SELECT COUNT(*) AS cnt FROM ${quotedTemp}`;
+        logger.info('[SyncAzzi001Service] SQL: %s', sql3);
+        const tempRows = await safeQuery(sql3);
+        result.tempCount = Number(tempRows[0]?.cnt ?? 0);
+
+        // 4. 删除目标 ENT 在原表中的数据
+        const sql4 = `DELETE FROM ${quotedTable} WHERE ${quotedField} = ?`;
+        logger.info('[SyncAzzi001Service] SQL: %s | params: %o', sql4, [targetEnt]);
+        const deleteResult = await safeExec(sql4, [targetEnt]);
+        result.deletedCount = deleteResult.rowCount ?? deleteResult.rowsAffected ?? 0;
+        logger.info('[SyncAzzi001Service] %s: 删除目标ENT数据 %d 条', tableName, result.deletedCount);
+
+        // 5. 从临时表插入到原表
+        const sql5 = `INSERT INTO ${quotedTable} SELECT * FROM ${quotedTemp}`;
+        logger.info('[SyncAzzi001Service] SQL: %s', sql5);
+        await externalDB.query(sql5);
+        result.insertedCount = result.tempCount;
+        logger.info('[SyncAzzi001Service] %s: 插入数据 %d 条', tableName, result.insertedCount);
+
+        // 6. 验证目标 ENT 数据条数
+        const sql6 = `SELECT COUNT(*) AS cnt FROM ${quotedTable} WHERE ${quotedField} = ?`;
+        logger.info('[SyncAzzi001Service] SQL: %s | params: %o', sql6, [targetEnt]);
+        const verifyRows = await safeQuery(sql6, [targetEnt]);
+        result.verifyCount = Number(verifyRows[0]?.cnt ?? 0);
+
+        result.success = true;
+        logger.info('[SyncAzzi001Service] %s: 同步完成，验证条数 %d', tableName, result.verifyCount);
+      }
     } catch (error) {
       result.error = error instanceof Error ? error.message : String(error);
       logger.error(error, '[SyncAzzi001Service] %s: 同步失败', tableName);
     } finally {
       // 7. 清理临时表（无论成功失败都要清理）
       try {
-        await externalDB.query(`DROP TABLE IF EXISTS "${tempTable}"`);
+        const sql7 = `DROP TABLE ${quotedTemp}`;
+        logger.info('[SyncAzzi001Service] SQL: %s', sql7);
+        await externalDB.query(sql7);
         logger.info('[SyncAzzi001Service] %s: 临时表已清理', tableName);
       } catch (dropError) {
         logger.error(dropError, '[SyncAzzi001Service] %s: 清理临时表失败', tableName);

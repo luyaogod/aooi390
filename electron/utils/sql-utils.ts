@@ -20,6 +20,19 @@ export function escapeStr(v: string): string {
     return v.replace(/'/g, "''");
 }
 
+/**
+ * 返回安全且大小写正确的双引号标识符。
+ * Kingbase/PostgreSQL 用小写，Oracle 用大写（其默认存储格式）。
+ */
+export function quoteIdent(name: string, label?: string): string {
+    const safe = validateIdentifier(name, label);
+    const dbType = externalDB.dbType;
+    if (dbType === 'oracle') {
+        return `"${safe.toUpperCase()}"`;
+    }
+    return `"${safe}"`;
+}
+
 // ---- Internal parameter converters ----
 
 function toPgParams(sql: string, params: unknown[]): { sql: string; params: unknown[] } {
